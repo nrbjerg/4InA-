@@ -60,7 +60,16 @@ class Trainer:
         shuffle(dataset)
         return dataset
     
-    def train (self, ):
+    def train (self, iterations: int, MCTSiterations: int, episodes: int, epochs: int):
+        """ Trains the model for each iteration, by creating a traning dataset and learning from set dataset """
+        for iteration in range(iterations):
+            print(f"Currently at iteration {iteration} / {iterations}")
+            dataset = self.createDataset(MCTSiterations, episodes)
+            
+            for e in epochs:
+                # TODO:
+                pass 
+                # ms, players, reward = list(zip(*[dataset[i] for ]))
         
     def saveCheckPoint (self, folder, filename):
         """ Saves the current model """
