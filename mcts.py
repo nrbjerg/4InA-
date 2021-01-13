@@ -1,14 +1,17 @@
+from typing import List
 from numba import njit, int32, float32
 import numpy as np
 from state import checkIfGameIsWon, makeMove, getAvailableMoves
 from torch import from_numpy, Tensor
 from model import Net
 import torch
+# TODO: I think this inteire file needs an overhaul (TO USE THE NEURAL NETWORK MORE.)
+# See https://web.stanford.edu/~surag/posts/alphazero.html
 
 @njit()
 def UCBscore (childPrior: float, parentVisits: int, childVisits: int, childValue: float) -> float:
     """ Computes the UCB score """
-    return childPrior * np.sqrt(parentVisits / (childVisits + 1)) - childValue
+    return childValue + childPrior * np.sqrt(parentVisits / (childVisits + 1))
 
 # TODO: JIT THIS CLASS 
 class Node:
@@ -75,7 +78,6 @@ class Node:
         """ Debugger pretty print node info """
         return "{0}\nPrior: {1:.2f} \nVisits: {2} \nValue: {3}".format(self.state, self.prior, self.visits, self.value)
 
-# @njit(None(Node.class_type.istance_type, float32[:]))
 def expand (node: Node, probabilities: np.array) -> None:
     """ Simpely expands the node with new propabilities """
     for a, prob in enumerate(probabilities.transpose()):
@@ -83,7 +85,7 @@ def expand (node: Node, probabilities: np.array) -> None:
             s = -makeMove(node.state, a) # NOTE: This will also copy the state, also the - makes sure that the next perspective is from the next player
             node.children[a] = Node(S = s, prior=prob[0])
 
-def backpropagate (path: [Node], score: int) -> None:
+def backpropagate (path: List[Node], score: int) -> None:
     """ Back propagate the value through the last path """
     n = len(path)
     for i in reversed(range(n)):

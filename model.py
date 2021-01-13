@@ -1,3 +1,4 @@
+import os
 import torch
 from torch import nn
 from torch import Tensor
@@ -14,7 +15,7 @@ def loss (output: (Tensor), target: (Tensor)):
 
 class Net(nn.Module):
     
-    def __init__ (self, hidden_nodes: int = 64):
+    def __init__ (self, numberOfHiddenNodes: int = 64):
         """ Initializes a model for tic tac toe """
         super(Net, self).__init__()
         # Convolutional Layers 
@@ -22,11 +23,13 @@ class Net(nn.Module):
         self.c1 = nn.Conv2d(1, 8, 3)
         self.c2 = nn.Conv2d(8, 8, 2) # 1, 8, 4, 3                   ]
         
-        self.hiddenLayer = nn.Linear(8 * 4 * 3, hidden_nodes)
+        # Hidden layers
+        self.h1 = nn.Linear(8 * 4 * 3, numberOfHiddenNodes)
+        self.h2 = nn.Linear(numberOfHiddenNodes, numberOfHiddenNodes)
         
         # Value and policy head
-        self.policy = nn.Linear(hidden_nodes, 7)
-        self.value = nn.Linear(hidden_nodes, 1)
+        self.policy = nn.Linear(numberOfHiddenNodes, 7)
+        self.value = nn.Linear(numberOfHiddenNodes, 1)
         
     def forward (self, x: Tensor) -> (Tensor):
         """ Pass data through the network and return the expected policy and value """
@@ -34,9 +37,11 @@ class Net(nn.Module):
         x = F.relu(self.c1(x))
         x = F.relu(self.c2(x))
         
-        # Flatten + Hidden layer
+        # Flatten + Hidden layers
         x = x.view(-1, 8 * 4 * 3)
-        x = F.relu(self.hiddenLayer(x))
+        x = F.relu(self.h1(x))
+        x = F.relu(self.h2(x))
+        
         # Policy
         p = torch.sigmoid(self.policy(x))
         
@@ -44,34 +49,26 @@ class Net(nn.Module):
         v = torch.tanh(self.value(x))  
            
         return p, v
+    
+    @property
+    def numberOfTrainableParameters(self):
+        """ Computes the number of trainable parameters """
+        return sum(p.numel() for p in self.parameters() if p.requires_grad)
 
-    
-if __name__ == "__main__":
-    loss = nn.CrossEntropyLoss()
-    inputs = torch.randn(3, 1, 6, 7, requires_grad=True).to(device)
-    target = torch.empty(3, dtype=torch.long).random_(7).to(device)
-    reward = torch.randn(3, 1).to(device)
-    model = Net()
-    model.cuda()
-    # 2. Initialize optimizer
-    optimizer = SGD(model.parameters(), lr = 0.001)
-    
-    # 3. Run training loop 
-    epochs = 20_000
-    printTime = epochs // 10
-    MSEloss = nn.MSELoss()
-    for e in range(epochs):
-        optimizer.zero_grad()
+def saveModel (model: Net, filename: str):
+    """ Saves the current model """
+    if (not os.path.exists("models")):
+        os.mkdir("models")
         
-        o1, o2 = model(inputs)
-        l1 = loss(o1, target) # TODO: I think that the current loss function is fucked.
-        l2 = MSEloss(o2, reward)
-        l = l1 + l2
-        l.backward()
-        optimizer.step()
-        
-        if ((e + 1) % printTime == 0):
-            print(f"  - Update! currently at epoch {e + 1} / {epochs}, with loss: {l.item():.6f}")
-    
-    # 4. Move model to cpu
-    model.cpu()
+    filepath = os.path.join(os.getcwd(), "models", filename)
+    torch.save(model, filepath)
+
+def loadModel(filename: str) -> Net:
+    """ Loads a model from the models directory """
+    return torch.load(os.path.join(os.getcwd(), "models", filename))
+
+def loadLatetestModel () -> Net:
+    """ Loads the latest model from the models directory """
+    file = sorted(os.listdir(os.path.join(os.getcwd(), "models")))[-1]
+    model = loadModel(file)
+    return model
