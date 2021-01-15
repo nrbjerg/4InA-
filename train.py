@@ -9,22 +9,21 @@ import copy
 from torch.optim import Adam, SGD
 from copy import deepcopy as dc
 
-# TODO: Load the last model
 # TODO: During training the model should get different initial states
 # TODO: Move to minibatch
 
-def playGame (state: np.array, m1: Net, m2: Net) -> int:
+def playGame (state: np.array, m1: Net, m2: Net, mctsSimulations: int) -> int:
     """ Returns 1 if m1 won the game, 0 if its a draw and -1 if m2 won """
     turn = 1
     
     while (checkIfGameIsWon(state) == -1):
         if ((turn % 2) == 0): 
             # M1 plays a move
-            state = -makeMove(state, getAction(state.copy(), 25, m1)) # Now state is from the view of the other player
+            state = -makeMove(state, getAction(state.copy(), mctsSimulations, m1)) # Now state is from the view of the other player
             
         else:
             # M2 plays a move
-            state = -makeMove(state, getAction(state.copy(), 25, m2)) # Now state is from the view of the other player
+            state = -makeMove(state, getAction(state.copy(), mctsSimulations, m2)) # Now state is from the view of the other player
             
         turn += 1
         # print(getStringRepresentation(state))
@@ -33,18 +32,17 @@ def playGame (state: np.array, m1: Net, m2: Net) -> int:
     # Check who won or drew the game.
     return checkIfGameIsWon(state) if (turn % 2 == 0) else -checkIfGameIsWon(state)
 
-def evaluateModel (model: Net) -> int:
+def evaluateModel (model: Net, mctsSimulations: int = 25) -> int:
     """ Tests a model against the current best """
     score = 0
     best = loadLatetestModel()
     state = np.zeros((6, 7), dtype = "float32")
-    # TODO: Go back to state.shape[1] instead of "1"
-    for idx in range(1): # Test a position at each starting position
+    for idx in range(state.shape[1]): # Test a position at each starting position
         s = -makeMove(state.copy(), idx)
         # print(getStringRepresentation(s))
         
-        score += playGame(s.copy(), model, best)
-        score -= playGame(s.copy(), best, model)
+        score += playGame(s.copy(), model, best, mctsSimulations)
+        score -= playGame(s.copy(), best, model, mctsSimulations)
         
     return score   
     
@@ -100,26 +98,34 @@ def train (model: Net, previousIteration: int = 0, epochs: int = 4_000, iteratio
     # Save the best model for evaluation of updated models
     improvement = False
     for iteration in range(iterations):
-        if (iteration != 0 and improvement == False):
-            # Load the latest model
-            model = loadLatetestModel()
-        # Create dataset
+        # Initialize iteration
         print(f"\nAt iteration {iteration + 1} / {iterations}")
+        if (iteration != 0 and improvement == False):
+            # Load the latest model i the last model did not improve it's score.
+            print(" + Loading the best model from disk.")
+            model = loadLatetestModel()
+            
+        # Create dataset
+        print(" + Creating dataset")
         dataset = createTrainingDataset(model, numberOfGames = gamesPerIterations, mctsSimulations = mctsSimulations)
-        print(f" - Created a dataset of {len(dataset)} examples.")
+        print(f"    - Created a dataset of {len(dataset)} datapoints.")
+        
         # Update model weights
-        print(f" - Updating model weights.")
+        print(" + Updating model weights:")
         model = updateWeights(model, epochs, dataset)
         
         # Pit the models against each other
-        print(" - Evaluating model...")
-        wins = evaluateModel(model)
-        print(f"    * Model score: {wins}.")
-        if (wins > 0): 
+        print(" + Evaluating model:")
+        score = evaluateModel(model, mctsSimulations = mctsSimulations)
+        print(f"    - score: {score}")
+        if (score > 0): 
             saveModel(model, str(iteration + 1 + previousIteration) + ".pt")
             improvement = True
         else:
-            improvement = False
+            if (score == 0):
+                improvement = True
+            else:
+                improvement = False
     
     return loadLatetestModel()
         
@@ -139,8 +145,8 @@ def updateWeights (model: Net, epochs: int, dataset: List[List[np.array]]) -> Ne
     
     # 1.1 Move datasets to gpu
     states = torch.from_numpy(s.reshape(s.shape[0], 1, s.shape[1], s.shape[2])).float().to(model.device)
-    probs = torch.from_numpy(p.reshape(p.shape[0], p.shape[2])).float().to(model.device) # TODO: Reshape these
-    rewards = torch.from_numpy(r.reshape(r.shape[0], r.shape[2])).float().to(model.device) # TODO: Reshape these
+    probs = torch.from_numpy(p.reshape(p.shape[0], p.shape[2])).float().to(model.device)
+    rewards = torch.from_numpy(r.reshape(r.shape[0], r.shape[2])).float().to(model.device)
     
     # 1.2 Move model to GPU
     model.cuda()
@@ -154,14 +160,14 @@ def updateWeights (model: Net, epochs: int, dataset: List[List[np.array]]) -> Ne
         optimizer.zero_grad()
         
         outputs = model(states)
-        l = loss(outputs, (probs, rewards)) # TODO: I think that the current loss function is fucked.
+        l = loss(outputs, (probs, rewards))
         l.backward()
         optimizer.step()
         
         if ((e + 1) % printTime == 0):
-            print(f"    * At epoch {(e + 1) / 1_000:.1f}k / {epochs // 1_000}k, with loss: {l.item():.3f}")
+            print(f"    - At epoch {(e + 1) / 1_000:.1f}k / {epochs // 1_000}k, with loss: {l.item():.3f}")
         elif (e == 0):
-            print(f"    * At epoch 1 / {epochs // 1_000}k, with loss: {l.item():.3f}")
+            print(f"    - At epoch 1 / {epochs // 1_000}k, with loss: {l.item():.3f}")
     
     # 4. Move model to cpu
     model.cpu()
@@ -170,16 +176,15 @@ def updateWeights (model: Net, epochs: int, dataset: List[List[np.array]]) -> Ne
     return model
 
 if __name__ == "__main__":
-    # TODO: Load the last best model
     if (len(os.listdir(os.path.join(os.getcwd(), "models"))) != 0):
-        file = sorted(os.listdir(os.path.join(os.getcwd(), "models")))[-1]
-        previousIteration = int(file.split(".")[0])
+        files = os.listdir(os.path.join(os.getcwd(), "models"))
+        previousIteration = sorted([int(f.split(".")[0]) for f in files])[-1]
         model = loadLatetestModel()
     else:    
         model = Net()
         previousIteration = 0
         saveModel(model, "0.pt")
-        
+    
     print(f"Initializing training of the {model.numberOfTrainableParameters} learnable parameters")
-    model = train(model, previousIteration = previousIteration, iterations = 100, epochs = 4_000, gamesPerIterations = 25)
+    model = train(model, previousIteration = previousIteration, iterations = 60, epochs = 4_000, gamesPerIterations = 32, mctsSimulations = 128)
     # print(executeEpisode(np.zeros((6, 7), dtype = "float32"), model, 25))

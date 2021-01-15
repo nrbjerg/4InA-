@@ -15,7 +15,7 @@ def loss (output: (Tensor), target: (Tensor)):
 
 class Net(nn.Module):
     
-    def __init__ (self, numberOfHiddenNodes: int = 64):
+    def __init__ (self, numberOfHiddenNodes: int = 256):
         """ Initializes a model for tic tac toe """
         super(Net, self).__init__()
         # Convolutional Layers 
@@ -69,6 +69,7 @@ def loadModel(filename: str) -> Net:
 
 def loadLatetestModel () -> Net:
     """ Loads the latest model from the models directory """
-    file = sorted(os.listdir(os.path.join(os.getcwd(), "models")))[-1]
+    files = os.listdir(os.path.join(os.getcwd(), "models"))
+    file = str(sorted([int(f.split(".")[0]) for f in files])[-1]) + ".pt"
     model = loadModel(file)
     return model
