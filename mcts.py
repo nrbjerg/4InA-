@@ -3,7 +3,7 @@ from numba import njit, int32, float32
 import numpy as np
 from state import checkIfGameIsWon, makeMove, getAvailableMoves
 from torch import from_numpy, Tensor
-from model import Net
+from model import Net, device
 import torch
 # TODO: I think this inteire file needs an overhaul (TO USE THE NEURAL NETWORK MORE.)
 # See https://web.stanford.edu/~surag/posts/alphazero.html
@@ -101,7 +101,8 @@ def MontecarloTreeSearch (state: np.array, n: int, model: torch.nn.Module) -> No
         
         def getModelOutputs (state: np.array, model: torch.nn.Module) -> np.array:
             """ Get propabilities form the neural network """
-            probs, value = model(from_numpy(state).view(1, 1, state.shape[1], state.shape[0])) # Convert to 4d tensor
+            torchState = from_numpy(state).view(1, 1, state.shape[1], state.shape[0])  # Convert to 4d tensor
+            probs, value = model(torchState)
             return probs.numpy() * getAvailableMoves(state), value.numpy() # Remove illegal moves, by giving them 0.0 propabilities
         
         # Initialize root node

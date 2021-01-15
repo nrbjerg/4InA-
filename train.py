@@ -185,6 +185,7 @@ if __name__ == "__main__":
         previousIteration = 0
         saveModel(model, "0.pt")
     
+    # model.cuda()
     print(f"Initializing training of the {model.numberOfTrainableParameters} learnable parameters")
     model = train(model, previousIteration = previousIteration, iterations = 60, epochs = 4_000, gamesPerIterations = 32, mctsSimulations = 128)
     # print(executeEpisode(np.zeros((6, 7), dtype = "float32"), model, 25))
