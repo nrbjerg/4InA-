@@ -9,7 +9,7 @@ from config import numberOfChannels, numberOfResidualBlocks, dropoutRate
 
 device = torch.device('cuda' if torch.cuda.is_available() else "cpu")
 
-def loss (output: (Tensor), target: (Tensor)):  
+def criterion (output: (Tensor), target: (Tensor)):  
     crossEntropy = torch.sum(target[0] * torch.log(output[0]))
     mse = nn.MSELoss()(output[1], target[1])
     return mse - crossEntropy

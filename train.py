@@ -1,6 +1,6 @@
 from typing import List
 from state import checkIfGameIsWon, getAvailableMoves, makeMove, getStringRepresentation
-from model import Net, loss, device, saveModel, loadLatetestModel, ResidualBlock
+from model import Net, criterion, device, saveModel, loadLatetestModel, ResidualBlock
 from config import *
 from mcts import MontecarloTreeSearch, Node, getAction
 import numpy as np
@@ -9,8 +9,6 @@ import torch
 import copy 
 from torch.optim import Adam, SGD
 from copy import deepcopy as dc
-
-# TODO: During training the model should get different initial states
 
 def playGame (state: np.array, m1: Net, m2: Net, mctsSimulations: int) -> int:
     """ Returns 1 if m1 won the game, 0 if its a draw and -1 if m2 won """
@@ -164,26 +162,40 @@ def updateWeights (model: Net, epochs: int, dataset: List[List[np.array]]) -> Ne
     model.train()
     
     # 2. Initialize optimizer
-    optimizer = SGD(model.parameters(), lr = learningRate)  
+    optimizer = Adam(model.parameters(), lr = learningRate)  
     
     # 3. Run training loop 
     printTime = epochs // 5
     for e in range(epochs):
-        # TODO: Move to minibatch
-        optimizer.zero_grad()
+        permutation = torch.randperm(states.size()[0])
         
-        outputs = model(states)
-        l = loss(outputs, (probs, rewards))
-        l.backward()
-        optimizer.step()
+        totalLoss = 0
+        for idx in range(0, states.size()[0], batchSize):
+
+            # 3.1 Load minibatch traning data
+            indices = permutation[idx:idx + batchSize]
+            s = states[indices]
+            p = probs[indices]
+            r = rewards[indices]
+            
+            # 3.2 Pass data though network & update weight using the optimizer
+            optimizer.zero_grad()
+            loss = criterion(model(s), (p, r))
+            loss.backward()
+            optimizer.step()
+            
+            # 3.3 Update the total loss
+            totalLoss += loss.item()
         
-        if ((e + 1) % printTime == 0 or e == 0 or e == 1):
-            print(f"    - At epoch {e + 1} / {epochs}, with loss: {l.item():.3f}")
+        if ((e + 1) % printTime == 0 or e == 0):
+            totalLoss /= states.size()[0] // batchSize # Get the average loss pr mini batch
+            print(f"    - At epoch {e + 1} / {epochs}, with loss: {totalLoss:.3f}")
     
     # Return model
     return model
 
 if __name__ == "__main__":
+    # TODO: Update the load model part
     if (len(os.listdir(os.path.join(os.getcwd(), "models"))) != 0):
         files = os.listdir(os.path.join(os.getcwd(), "models"))
         previousIteration = sorted([int(f.split(".")[0]) for f in files])[-1]
