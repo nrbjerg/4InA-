@@ -1,6 +1,7 @@
 from typing import List
 from state import checkIfGameIsWon, getAvailableMoves, makeMove, getStringRepresentation
-from model import Net, loss, device, saveModel, loadLatetestModel
+from model import Net, loss, device, saveModel, loadLatetestModel, ResidualBlock
+from config import *
 from mcts import MontecarloTreeSearch, Node, getAction
 import numpy as np
 import os
@@ -10,7 +11,6 @@ from torch.optim import Adam, SGD
 from copy import deepcopy as dc
 
 # TODO: During training the model should get different initial states
-# TODO: Move to minibatch
 
 def playGame (state: np.array, m1: Net, m2: Net, mctsSimulations: int) -> int:
     """ Returns 1 if m1 won the game, 0 if its a draw and -1 if m2 won """
@@ -36,6 +36,9 @@ def evaluateModel (model: Net, mctsSimulations: int = 25) -> int:
     """ Tests a model against the current best """
     score = 0
     best = loadLatetestModel()
+    if (gpu == True): 
+        # print("Model was moved!")
+        best.cuda() # Load the model on gpu if gpu is set to true
     state = np.zeros((6, 7), dtype = "float32")
     for idx in range(state.shape[1]): # Test a position at each starting position
         s = -makeMove(state.copy(), idx)
@@ -48,6 +51,7 @@ def evaluateModel (model: Net, mctsSimulations: int = 25) -> int:
     
 def createTrainingDataset (model: Net, numberOfGames: int = 100, mctsSimulations: int = 25) -> List[List[np.array]]:
     """ Creates a training dataset for the model """
+    model.eval() # Set model to eval mode
     dataset = []
     for _ in range(numberOfGames): # Create n games, to train the neural network upon
         dataset += executeEpisode(np.zeros((6, 7), dtype = "float32"), model, mctsSimulations)
@@ -57,7 +61,7 @@ def assignRewards (examples: List[List[np.array]], reward: float) -> List[List[n
     """" Loop through the examples and assign them the reward """
     n = len(examples)
     for i in reversed(range(n)): # Loop through the examples backwards
-        if (i % 2 != n % 2): # NOTE: The rewards are converted to match the output of the neural network
+        if ((i % 2) != (n % 2)): # NOTE: The rewards are converted to match the output of the neural network
             examples[i][-1] = np.array([[-reward]], dtype = "float32") # This player lost the game
         else: 
             examples[i][-1] = np.array([[reward]], dtype = "float32") # This player won the game
@@ -88,7 +92,7 @@ def executeEpisode (state: np.array, model: Net, mctsSimulations: int) -> List[L
         if (reward != -1):
             # The game is ether won or drawn
             examples.append([state, np.zeros((1, 7), dtype = "float32"), None])
-            return assignRewards(addMirrorsToExamples(examples), reward)
+            return addMirrorsToExamples(assignRewards(examples, reward))
         else:
             # The game is not over yet
             state *= -1
@@ -104,7 +108,9 @@ def train (model: Net, previousIteration: int = 0, epochs: int = 4_000, iteratio
             # Load the latest model i the last model did not improve it's score.
             print(" + Loading the best model from disk.")
             model = loadLatetestModel()
-            
+            if (gpu == True):
+                model.cuda()
+        
         # Create dataset
         print(" + Creating dataset")
         dataset = createTrainingDataset(model, numberOfGames = gamesPerIterations, mctsSimulations = mctsSimulations)
@@ -143,20 +149,27 @@ def updateWeights (model: Net, epochs: int, dataset: List[List[np.array]]) -> Ne
     # 1. Convert dataset
     s, p, r = convertDatasetToNumpyArrays(dataset)
     
-    # 1.1 Move datasets to gpu
-    states = torch.from_numpy(s.reshape(s.shape[0], 1, s.shape[1], s.shape[2])).float().to(model.device)
-    probs = torch.from_numpy(p.reshape(p.shape[0], p.shape[2])).float().to(model.device)
-    rewards = torch.from_numpy(r.reshape(r.shape[0], r.shape[2])).float().to(model.device)
+    # 1.1 Move datasets & model to gpu
+    if (gpu == True):
+        states = torch.from_numpy(s.reshape(s.shape[0], 1, s.shape[1], s.shape[2])).float().to(model.device)
+        probs = torch.from_numpy(p.reshape(p.shape[0], p.shape[2])).float().to(model.device)
+        rewards = torch.from_numpy(r.reshape(r.shape[0], r.shape[2])).float().to(model.device)
+        
+    else:
+        states = torch.from_numpy(s.reshape(s.shape[0], 1, s.shape[1], s.shape[2])).float()
+        probs = torch.from_numpy(p.reshape(p.shape[0], p.shape[2])).float()
+        rewards = torch.from_numpy(r.reshape(r.shape[0], r.shape[2])).float()
     
-    # 1.2 Move model to GPU
-    model.cuda()
-
+    # 1.2 Set model to training mode 
+    model.train()
+    
     # 2. Initialize optimizer
-    optimizer = Adam(model.parameters(), lr = 0.001)  
+    optimizer = SGD(model.parameters(), lr = learningRate)  
     
     # 3. Run training loop 
     printTime = epochs // 5
     for e in range(epochs):
+        # TODO: Move to minibatch
         optimizer.zero_grad()
         
         outputs = model(states)
@@ -164,13 +177,8 @@ def updateWeights (model: Net, epochs: int, dataset: List[List[np.array]]) -> Ne
         l.backward()
         optimizer.step()
         
-        if ((e + 1) % printTime == 0):
-            print(f"    - At epoch {(e + 1) / 1_000:.1f}k / {epochs // 1_000}k, with loss: {l.item():.3f}")
-        elif (e == 0):
-            print(f"    - At epoch 1 / {epochs // 1_000}k, with loss: {l.item():.3f}")
-    
-    # 4. Move model to cpu
-    model.cpu()
+        if ((e + 1) % printTime == 0 or e == 0 or e == 1):
+            print(f"    - At epoch {e + 1} / {epochs}, with loss: {l.item():.3f}")
     
     # Return model
     return model
@@ -185,7 +193,7 @@ if __name__ == "__main__":
         previousIteration = 0
         saveModel(model, "0.pt")
     
-    # model.cuda()
+    if (gpu == True): model.cuda()
     print(f"Initializing training of the {model.numberOfTrainableParameters} learnable parameters")
-    model = train(model, previousIteration = previousIteration, iterations = 60, epochs = 4_000, gamesPerIterations = 32, mctsSimulations = 128)
+    model = train(model, previousIteration = previousIteration, iterations = iterations, epochs = epochs, gamesPerIterations = newGamesPerIteration, mctsSimulations = mctsSimulations)
     # print(executeEpisode(np.zeros((6, 7), dtype = "float32"), model, 25))

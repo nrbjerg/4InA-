@@ -3,7 +3,8 @@ from numba import njit, int32, float32
 import numpy as np
 from state import checkIfGameIsWon, makeMove, getAvailableMoves
 from torch import from_numpy, Tensor
-from model import Net, device
+from model import Net, device, ResidualBlock
+from config import c, gpu
 import torch
 # TODO: I think this inteire file needs an overhaul (TO USE THE NEURAL NETWORK MORE.)
 # See https://web.stanford.edu/~surag/posts/alphazero.html
@@ -11,7 +12,7 @@ import torch
 @njit()
 def UCBscore (childPrior: float, parentVisits: int, childVisits: int, childValue: float) -> float:
     """ Computes the UCB score """
-    return childValue + childPrior * np.sqrt(parentVisits / (childVisits + 1))
+    return childValue + c * childPrior * np.sqrt(parentVisits / (childVisits + 1))
 
 # TODO: JIT THIS CLASS 
 class Node:
@@ -101,8 +102,19 @@ def MontecarloTreeSearch (state: np.array, n: int, model: torch.nn.Module) -> No
         
         def getModelOutputs (state: np.array, model: torch.nn.Module) -> np.array:
             """ Get propabilities form the neural network """
-            torchState = from_numpy(state).view(1, 1, state.shape[1], state.shape[0])  # Convert to 4d tensor
+            if (gpu == True): 
+                # Reshape data and move it to gpu
+                torchState = from_numpy(state).view(1, 1, state.shape[1], state.shape[0]).to(device)  # Convert to 4d tensor
+            else:
+                # Reshape data
+                torchState = from_numpy(state).view(1, 1, state.shape[1], state.shape[0])
             probs, value = model(torchState)
+            
+            # Move data back to cpu
+            if (gpu == True):
+                probs = probs.to("cpu")
+                value = value.to("cpu")
+                
             return probs.numpy() * getAvailableMoves(state), value.numpy() # Remove illegal moves, by giving them 0.0 propabilities
         
         # Initialize root node
@@ -144,5 +156,7 @@ def getAction (S: np.array, n: int, model: torch.nn.Module) -> int:
 
 if __name__ == "__main__":
     S = np.zeros((6, 7), dtype = "float32")
-    root = MontecarloTreeSearch(S, 100, Net())
+    model = Net()
+    model.cuda()
+    root = MontecarloTreeSearch(S, 100, model)
     

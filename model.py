@@ -5,6 +5,7 @@ from torch import Tensor
 from torch.optim import SGD, Adam
 import torch.nn.functional as F
 import numpy as np
+from config import numberOfChannels, numberOfResidualBlocks, dropoutRate
 
 device = torch.device('cuda' if torch.cuda.is_available() else "cpu")
 
@@ -13,40 +14,70 @@ def loss (output: (Tensor), target: (Tensor)):
     mse = nn.MSELoss()(output[1], target[1])
     return mse - crossEntropy
 
+class ResidualBlock(nn.Module):
+    
+    def __init__ (self, channels: int, kernelSize: int, p: int):
+        """ Initializes a residual block """
+        super(ResidualBlock, self).__init__()
+        self.c1 = nn.Conv2d(channels, channels, kernelSize, padding = p)
+        self.c2 = nn.Conv2d(channels, channels, kernelSize, padding = p)
+        
+
+    def forward (self, x: torch.Tensor) -> torch.Tensor:
+        """ Sends the tensor through the layer """
+        residual = x
+        x = F.relu(self.c1(x))
+        x = F.relu(self.c2(x) + residual)
+        return x
+    
 class Net(nn.Module):
     
-    def __init__ (self, numberOfHiddenNodes: int = 256):
+    def __init__ (self):
         """ Initializes a model for tic tac toe """
         super(Net, self).__init__()
         # Convolutional Layers 
         self.device = torch.device('cuda' if torch.cuda.is_available() else "cpu")
-        self.c1 = nn.Conv2d(1, 8, 3)
-        self.c2 = nn.Conv2d(8, 8, 2) # 1, 8, 4, 3                   ]
+        self.firstConvolution = nn.Conv2d(1, numberOfChannels, 3, padding = 1)
+        
+        self.residualBlocks = nn.ModuleList([ResidualBlock(numberOfChannels, 3, 1) for i in range(numberOfResidualBlocks)])
+        
+        self.outputFromResidualLayers = numberOfChannels * 6 * 7 # Output dimension from the residual blocks
+        
+        # self.c2 = nn.Conv2d(8, 8, 2) # 1, 8, 4, 3
         
         # Hidden layers
-        self.h1 = nn.Linear(8 * 4 * 3, numberOfHiddenNodes)
-        self.h2 = nn.Linear(numberOfHiddenNodes, numberOfHiddenNodes)
+        # self.h1 = nn.Linear(8 * 4 * 3, numberOfHiddenNodes)
+        # self.h2 = nn.Linear(numberOfHiddenNodes, numberOfHiddenNodes)
         
         # Value and policy head
-        self.policy = nn.Linear(numberOfHiddenNodes, 7)
-        self.value = nn.Linear(numberOfHiddenNodes, 1)
+        self.policyHiddenLayer1 = nn.Linear(self.outputFromResidualLayers, self.outputFromResidualLayers)
+        self.policyDropoutLayer = nn.Dropout(dropoutRate)
+        self.policyHiddenLayer2 = nn.Linear(self.outputFromResidualLayers, 7)
+        
+        self.valueHiddenLayer1 = nn.Linear(self.outputFromResidualLayers, self.outputFromResidualLayers)
+        self.valueDropoutLayer = nn.Dropout(dropoutRate)
+        self.valueHiddenLayer2 = nn.Linear(self.outputFromResidualLayers, 1)
         
     def forward (self, x: Tensor) -> (Tensor):
         """ Pass data through the network and return the expected policy and value """
         # Convolutional layers
-        x = F.relu(self.c1(x))
-        x = F.relu(self.c2(x))
+        x = F.relu(self.firstConvolution(x))
+        
+        for r in self.residualBlocks:
+            x = r(x)
         
         # Flatten + Hidden layers
-        x = x.view(-1, 8 * 4 * 3)
-        x = F.relu(self.h1(x))
-        x = F.relu(self.h2(x))
+        x = x.view(-1, self.outputFromResidualLayers) # Flatten the output of the residual blocks
         
         # Policy
-        p = torch.sigmoid(self.policy(x))
+        p = F.relu(self.policyHiddenLayer1(x))
+        p = self.policyDropoutLayer(p)
+        p = torch.sigmoid(self.policyHiddenLayer2(p))
         
         # Value 
-        v = torch.tanh(self.value(x))  
+        v = F.relu(self.valueHiddenLayer1(x))
+        v = self.valueDropoutLayer(v)
+        v = torch.tanh(self.valueHiddenLayer2(v))  
            
         return p, v
     
@@ -73,3 +104,8 @@ def loadLatetestModel () -> Net:
     file = str(sorted([int(f.split(".")[0]) for f in files])[-1]) + ".pt"
     model = loadModel(file)
     return model
+
+if __name__ == "__main__":
+    model = Net()
+    print(model(torch.randn(1, 1, 6, 7)))
+    print(model.numberOfTrainableParameters)
