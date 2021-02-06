@@ -1,0 +1,18 @@
+MCTS: 
+    - Look for speedups (Maybe some of the methods can be improved using numba)
+    - Figure out a way to run multiple mcts instances at the same time, 
+    storing each state in a queue for evaluation by the network 
+General: 
+    - Add better comments & better doc strings
+    - Figure out if the project could benefit from moving to tensorflow
+Model: 
+    - Update loss function (make it more numerical stable)
+    - Move from sigmoid to softmax in the value head
+    - Do research into rollout networks
+State:
+    - Implement history in states (read somewhere that it could work as an attention mechanism)
+    - Update the functions related to state in general.
+Training:
+    - Implement near deterministic play after x moves (lower temperature in MCTS)
+    - Save data in json format (could be used for later models)
+    - Adaptive learning rate

@@ -4,25 +4,27 @@ from config import width, height, numberOfMapsPerPlayer
 
 @njit()
 def flipPlayer (state: np.array):
-    """ Sets the last idx of state to match the current player """
+    """ Flips the values in the last index of the states tensor from 0 to 1 or from 1 to 0 """
     state[-1].fill(1 if state[-1][0][0] != 1 else 0)
 
 @njit
 def generateEmptyState () -> np.array:
-    """ Generates an empty state """
-    # State[:numberOfMapsPerPlayer] = x, State[numberOfMapsPerPlayer:2 * numberOfMapsPerPlayer] = o, state[-1] = indicates the current player
+    """ 
+        Returns:
+            - An empty state with no moves played
+    """
     state = np.zeros((2 * numberOfMapsPerPlayer + 1, height, width), dtype = np.float32)
-    state[-1].fill(1)
+    state[-1].fill(1) # Indicate that it's the turn of player x
     return state
 
 def flipGameState (state: np.array) -> np.array:
-    """ Flips the board around the y axis """
+    """ Flips the board around the y axis & returns a new view """
     return np.flip(state, axis = 2)
     
 @njit()
 def checkIfGameIsWon (state: np.array) -> int:
     """ 
-        Checks if the last player won the game
+        Checks if the last player won the game, given the current state of the game
         Returns:
             1  if the last player won the game.
             0  if the game was a draw.
@@ -58,29 +60,38 @@ def checkIfGameIsWon (state: np.array) -> int:
     
 @njit()
 def makeMove (state: np.array, idx: int) -> np.array:
-    """ Copies the state and makes a move on the copy """
-    # TODO: Add support for history
-    mask = state[0] + state[numberOfMapsPerPlayer]
+    """ 
+        Args: 
+            - State: the numpy array currently representing the game
+            - Idx: the index of the move (along the x axis)
+        Returns:
+            - A copy of the state, with the new move played. (Also the player is switched)
+    """
     currentMapIdx = 0 if (state[-1][0][0] == 1.0) else numberOfMapsPerPlayer
     state = state.copy()
-    for i in range(1, height + 1): # Play moves from the button up
-        if (mask[height - i][idx] == 0.0):
+    # Play moves from the button up
+    for i in range(1, height + 1):
+        if (state[0][height - i][idx] == 0.0 and state[numberOfMapsPerPlayer][height - i][idx] == 0.0):
             # Play the move
             state[currentMapIdx][height - i][idx] = 1.0
             break
     
-    # Flips the player
     flipPlayer(state) 
        
     return state
 
 @njit()
 def validMoves(state: np.array) -> np.array:
-    """ Generates an array of elements set to 1 if the move is possible and 0 otherwise"""
-    mask = state[0] + state[numberOfMapsPerPlayer]
-    result = np.zeros((1, width), dtype = np.float32) # NOTE: Make sure that the dimensions of the output array matches 
+    """ 
+        Args: 
+            - State: the numpy array currently representing the game
+        Returns:
+            - A matrix in the dimensions (1, width), with each element set to 0 
+              if the appropriate move is not valid and 1 otherwise.
+    """
+    result = np.zeros((1, width), dtype = np.float32) 
     for i in range(width):
-        if (mask[0][i] == 0.0): result[0][i] = 1.0
+        if (state[0][0][i] == 0.0 and state[numberOfMapsPerPlayer][0][i] == 0.0): result[0][i] = 1.0
     return result
 
 def getStringRepresentation (state: np.array) -> str:
@@ -97,27 +108,3 @@ def getStringRepresentation (state: np.array) -> str:
             else:
                 lines[-1] += " |"
     return "".join(lines)
-
-if __name__ == '__main__':
-    state = np.array([[[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-                       [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-                       [0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0],
-                       [0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-                       [0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0],
-                       [0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0]],
-                      [[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-                       [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-                       [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-                       [0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0],
-                       [0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0],
-                       [1.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0]],
-                      [[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
-                       [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
-                       [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
-                       [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
-                       [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
-                       [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]]])
-    # print(checkIfGameIsWon(state))
-    print(getStringRepresentation(state))
-    print(getStringRepresentation(flipGameState(state)))
-    
