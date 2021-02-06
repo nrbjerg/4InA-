@@ -1,0 +1,3 @@
+Update loss function (make it more numerical stable)
+Implement deterministic play after x moves
+Implement history in states (as an attention mechanism)

@@ -1,162 +1,145 @@
-from typing import List
-from numba import njit, int32, float32
-import numpy as np
-from state import checkIfGameIsWon, makeMove, getAvailableMoves
-from torch import from_numpy, Tensor
-from model import Net, device, ResidualBlock
-from config import c, gpu
+from typing import Tuple
+import numpy as np 
+from model import Net, device
+from state import checkIfGameIsWon, flipPlayer, generateEmptyState, makeMove, validMoves
+from config import Cpuct, enableValueHeadAfterIteration, rooloutsDuringTraining, width, height, mctsGPU, numberOfMapsPerPlayer, epsilon
 import torch
-# TODO: I think this inteire file needs an overhaul (TO USE THE NEURAL NETWORK MORE.)
-# See https://web.stanford.edu/~surag/posts/alphazero.html
+from logger import *
 
-@njit()
-def UCBscore (childPrior: float, parentVisits: int, childVisits: int, childValue: float) -> float:
-    """ Computes the UCB score """
-    return childValue + c * childPrior * np.sqrt(parentVisits / (childVisits + 1))
-
-# TODO: JIT THIS CLASS 
-class Node:
+class MCTS:
     
-    def __init__ (self, S: np.array, prior: float):
-        """ Initializes a node for monte carlo tree search """
-        self.visits = 0
-        self.prior = prior
-        self.totalValue = 0
-        self.children = {}
-        self.state = S
-
-    def isExpanded (self):
-        """ Check if the node has been expanded """
-        return len(self.children.keys()) > 0
-    
-    @property
-    def probabilities (self) -> np.array:
-        """ Gives the probabilities of each of the children """
-        probs = np.zeros((1, self.state.shape[1]), dtype = "float32")
-        for key in range(self.state.shape[1]):
-            if (key in self.children.keys()):
-                probs[0][key] = self.children[key].visits / self.visits
-        return probs
-    
-    @property
-    def value(self):
-        """ The value of the node """
-        if (self.visits == 0): return 0
+    def __init__ (self, model: Net, iteration: int = 0):
+        """ Stores the data used for Monte-Carlo tree search """
+        self.model = model
+        self.model.eval()
+        
+        if (mctsGPU == True): self.model.cuda()
+        
+        self.iteration = iteration
+        
+        # NOTE: Each state will be stored under the key: state.tobytes(), meaning that the byte string representing the numpy array will be used as a key
+        self.Qsa = {} # The Q values for s,a
+        self.Nsa = {} # The number of times the action a has been taken from state s
+        self.Ns = {} # The number of times the state has been visited
+        self.Ps = {} # Stores the initial policy (from the neural network)
+        
+        self.Es = {} # Stores if the current state has terminated (1 for win, 0 for draw, -1 for not terminated)
+        self.Vs = {} # Stores the valid moves for the state s
+        
+    def getActionProbs (self, state: np.array, roolouts: int, temperature: float = 1.0) -> np.array:
+        """ Perform mcts on the state and return the probability vector for the state """
+        # Populate the dictionaries 
+        for _ in range(roolouts):
+            self.search(state)
+        
+        s = state.tobytes() # This is used as the key
+        counts = np.array([[self.Nsa[(s, a[1])] if ((s, a[1]) in self.Nsa) else 0 
+                            for a, mask in np.ndenumerate(validMoves(state))]], dtype = "float32")
+        
+        if (temperature == 0.0):
+            probs = np.zeros((1, width), dtype = "float32")
+            # If there is two instances of the max value this always picks the first one.
+            probs[0][np.argmax(counts)] = 1.0 
+            return probs
+        
         else:
-            return self.totalValue / self.visits
+            probs = np.power(counts, 1.0 / temperature) / np.sum(counts)
+            return probs
     
-    def selectAction (self, t: float):
-        """ Select an action based on the children's visit counts and the temperature (t) """
-        # Number of visits and the valid actions
-        visits = np.array([child.visits for child in self.children.values()])
-        actions = [action for action in self.children.keys()]
-        
-        # Chose an action based on the temperature
-        try:
-            if (t == 0):
-                action = actions[np.argmax((visits))]
-            else:
-                distribution = np.power(visits, (1 / t))
-                action = np.random.choice(actions, p=(distribution / np.sum(distribution)))
-        except ValueError:
-            action = 0
+    def getMove (self, state: np.array, roolouts: int) -> int:
+        """ Returns the move recommended by the mcts """
+        return np.argmax(self.getActionProbs(state, roolouts, temperature = 0.0))
+    
+    def predict(self, state: np.array) -> Tuple[np.array, float]:
+        """ Converts the current state to a torch tensor and passes it through the neural network """
+        with torch.no_grad():
+            # Format the data correctly for the neural network & move it to gpu
+            stateTensor = torch.from_numpy(state).view(1, 2 * numberOfMapsPerPlayer + 1, height, width)
+            if (mctsGPU == True): 
+                stateTensor = stateTensor.to(device)
+    
+            probs, value = self.model(stateTensor)
+
+            # Move predictions back to cpu
+            if (mctsGPU == True):
+                probs = probs.cpu()
+                value = value.cpu()
                 
-        return action
-               
-    def selectChild (self):
-        """ Selects a child based on the UCB score """
-        best = {"s": -np.inf, "a": None, "c": None}
+            return (probs.numpy(), value[0][0])
+            
+    def search (self, state: np.array):
+        """ Performs the actual MCTS search recursively """
+        s = state.tobytes() # This is used as the key
         
-        # Find the child and action with the best UCB score 
-        for action, child in self.children.items():
-            score = UCBscore(child.prior, self.visits, child.visits, child.value)
-            if (score > best["s"]):
-                best = {"s": score, "a": action, "c": child}
+        # Save board termination 
+        if (s not in self.Es):
+            self.Es[s] = checkIfGameIsWon(state)
+              
+        if (self.Es[s] != -1):
+            # This is a terminal node 
+            return self.Es[s] # return 1 if the previous player won the game (0 otherwise)
         
-        return (best["a"], best["c"]) # Return a tuple of the best action (int) and the best child (node)
-        
-    def __repr__(self):
-        """ Debugger pretty print node info """
-        return "{0}\nPrior: {1:.2f} \nVisits: {2} \nValue: {3}".format(self.state, self.prior, self.visits, self.value)
-
-def expand (node: Node, probabilities: np.array) -> None:
-    """ Simpely expands the node with new propabilities """
-    for a, prob in enumerate(probabilities.transpose()):
-        if (prob[0] != 0.0):
-            s = -makeMove(node.state, a) # NOTE: This will also copy the state, also the - makes sure that the next perspective is from the next player
-            node.children[a] = Node(S = s, prior=prob[0])
-
-def backpropagate (path: List[Node], score: int) -> None:
-    """ Back propagate the value through the last path """
-    n = len(path)
-    for i in reversed(range(n)):
-        if (i % 2 != n % 2):
-            path[i].totalValue += score 
-        else: 
-            path[i].totalValue -= score
-        path[i].visits += 1  
-        
-def MontecarloTreeSearch (state: np.array, n: int, model: torch.nn.Module) -> Node:
-    """ Performs Monte-Carlo tree search on the state """
-    with torch.no_grad(): # This will not train the neural network therefore we don't need the gradients
-        
-        def getModelOutputs (state: np.array, model: torch.nn.Module) -> np.array:
-            """ Get propabilities form the neural network """
-            if (gpu == True): 
-                # Reshape data and move it to gpu
-                torchState = from_numpy(state).view(1, 1, state.shape[1], state.shape[0]).to(device)  # Convert to 4d tensor
+        if (s not in self.Ps):
+            # We have hit a leaf node (not explored yet)
+            self.Ps[s], v = self.predict(state)
+            valids = validMoves(state)
+            self.Ps[s] = self.Ps[s] * valids # Mask probs (set probs[i] to 0 if i is not a valid move.)
+            sumOfProbs = np.sum(self.Ps[s])
+            
+            if (sumOfProbs > 0): # Normalize the probs
+                self.Ps[s] /= sumOfProbs
             else:
-                # Reshape data
-                torchState = from_numpy(state).view(1, 1, state.shape[1], state.shape[0])
-            probs, value = model(torchState)
+                # If all probs where but the state isn't terminal, give all valid moves equal probability
+                warning("Warning: all moves where masked... ")
+                self.Ps[s] = valids / np.sum(valids)
             
-            # Move data back to cpu
-            if (gpu == True):
-                probs = probs.to("cpu")
-                value = value.to("cpu")
-                
-            return probs.numpy() * getAvailableMoves(state), value.numpy() # Remove illegal moves, by giving them 0.0 propabilities
-        
-        # Initialize root node
-        root = Node(state, 0.0)
-
-        # Expand root
-        expand(root, getModelOutputs(state, model)[0])
+            self.Vs[s] = valids
+            self.Ns[s] = 0
             
-        for _ in range(n): # Perform the n iterations
-            state *= -1 # Switch the view
-            node = root
-            path = [node] # Search path
-            
-            # Select until we reach a leaf node
-            while node.isExpanded():
-                action, node = node.selectChild()
-                # print(node.state)
-                path.append(node)
-            
-            # We are now at a leaf node
-            leafState = node.state
-            value = checkIfGameIsWon(leafState) # Check if the previous move won the game
-
-            if (value == -1): # Then the games hasn't ended
-                # Expand the leaf node
-                probs, predictedValue = getModelOutputs(leafState, model)
-                expand(node, probs)
-                backpropagate(path, predictedValue) # Update the visit counts
+            if (self.iteration > enableValueHeadAfterIteration):
+                return -v # This is in relation to the current player, therefore the value that should be backpropagated is -v
             else: 
-                # Backpropagate the value of the leaf node back up the tree
-                backpropagate(path, value)
+                return 0 # Enable value head after a couple of iterations 
+            
+        # Pick the action with the heighest UCBscore
+        best = {"score": -np.inf, "a": None}
+        
+        for a in range(width):
+            if (self.Vs[s][0][a] == 1):
+                prior = self.Ps[s][0][a]
+                if (s, a) in self.Qsa:
+                    # Compute the UCB score
+                    u = self.Qsa[(s, a)] + Cpuct * prior * np.sqrt(self.Ns[s]) /  (1 + self.Nsa[(s, a)])
                 
-        return root
-
-def getAction (S: np.array, n: int, model: torch.nn.Module) -> int:
-    """ Computes the best action (gives the index of the best move) """
-    root = MontecarloTreeSearch(S, n, model)
-    return root.selectAction(0)
-
-if __name__ == "__main__":
-    S = np.zeros((6, 7), dtype = "float32")
-    model = Net()
-    model.cuda()
-    root = MontecarloTreeSearch(S, 100, model)
+                else:
+                    # When Q = 0
+                    u = Cpuct * prior * np.sqrt(self.Ns[s] + epsilon)
+                
+                if (u > best["score"]):
+                    best["score"] = u
+                    best["a"] = a
+        
+        # Compute the value recursively
+        action = best["a"]
+        v = self.search(makeMove(state, action))
+        
+        if (s, action) in self.Qsa:
+            self.Qsa[(s, action)] = (self.Nsa[(s, action)] * self.Qsa[(s, action)] + v) / (self.Nsa[(s, action)] + 1)
+            self.Nsa[(s, action)] += 1
+            
+        else:
+            self.Qsa[(s, action)] = v
+            self.Nsa[(s, action)] = 1
+                    
+        self.Ns[s] += 1   
+        
+        return -v
     
+    def reset (self) -> None:
+        """ Resets the dictionaries (used when evaluating the networks) """
+        self.Qsa = {}; self.Nsa = {}; self.Ns = {}
+        self.Ps = {}; self.Es = {}; self.Vs = {}
+        
+if (__name__ == "__main__"):
+    mcts = MCTS(Net())
+    print(mcts.getActionProbs(generateEmptyState(), rooloutsDuringTraining))

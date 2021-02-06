@@ -1,2 +1,2 @@
-# 4 In A -
-A simple implementation of Alpha Zero for the game of Connect 4 currently under development
+# 4inA-
+An implementation of Alpha Zero, for connect 4.

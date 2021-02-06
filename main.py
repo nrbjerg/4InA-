@@ -1,27 +1,21 @@
-from mcts import getAction
-from state import getAvailableMoves, getStringRepresentation, checkIfGameIsWon, makeMove
-from model import Net, loadLatetestModel
-import numpy as np
+from state import *
+from mcts import MCTS
+from utils import loadLatetestModel
+from model import Net
+from config import rooloutsDuringEvaluation
 
-if (__name__ == "__main__"):
-    model = loadLatetestModel()
-    state = np.zeros((6, 7), dtype = "float32")
-    state = -makeMove(state.copy(), getAction(state.copy(), 128, model))
-    turn = 1
+state = generateEmptyState()
+mcts = MCTS(loadLatetestModel())
+
+while (checkIfGameIsWon(state) == -1):
+    print(getStringRepresentation(state), "\n")
+    if (state[-1][0][0] == 0):
+        valids = validMoves(state)
+        move = int(input("Your move idx: "))
+        while (valids[0][move] != 1):
+            move = int(input("Your input was invalid, please input new idx: "))
+        state = makeMove(state, move)
+    else:
+        state = makeMove(state, mcts.getMove(state, rooloutsDuringEvaluation))
     
-    while (checkIfGameIsWon(state) == -1):
-        if ((turn % 2) == 0):
-            # It's the neural nets turn 
-            state = makeMove(state.copy(), getAction(state.copy(), 128, model))
-        else:
-            # It's your turn
-            print(getStringRepresentation(state))
-            idx = int(input("Move idx: "))
-            if (getAvailableMoves(state)[0][idx] == 0):
-                print("Move is not available")
-            else:
-                state = makeMove(state.copy(), idx)
-            pass
-        state *= -1
-        turn += 1
     print(getStringRepresentation(state))

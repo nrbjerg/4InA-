@@ -1,25 +1,46 @@
+# MCTS: 
+Cpuct = 3.0
+mctsGPU = True
+epsilon = 1e-8
 
-# ------------------------------- MTCS configurations --------------------------------------
-mctsSimulations = 25
-c = 1 # Exploration / Exploitation
+# Training:
+iterations = 20
+numberOfGames = 20
+rooloutsDuringTraining = 200
+# Enable value head halfway through the training process
+enableValueHeadAfterIteration = iterations // 2
 
+# Training window
+def Window (iteration: int) -> int:
+    if (iteration < 3):
+        return 2
+    else:
+        return iteration // 2
 
+learningRate = 0.001 # TODO: Implement adaptive learning rate
+epochs = 8
+batchSize = 100
+trainingOnGPU = True
 
-# ----------------------------- Training configurations ------------------------------------
-epochs = 40 # Number of epochs pr iteration
-newGamesPerIteration = 100 # Number of new games per iteration
-savedEpisodes = 10000 # Number of saved episodes used for training
-batchSize = 500
-iterations = 1
-learningRate = 0.001 # Recommended learning rate is 0.001
-gpu = True
+# Evaluation:
+numberOfEvaluationGames = 49 # Per player (max 49.)
+rooloutsDuringEvaluation = 32
 
+# Model:
+numberOfFilters = 128 
+numberOfResidualBlocks = 4 # TRAINING: INCREASE
+numberOfNeurons = 256 # In the heads of the networks 
+performBatchNorm = True
+dropoutRate = 0.3
+disableValueHead = False
 
+# Valuehead:
+valueHeadFilters = 8
 
-# ------------------------------ Model configurations --------------------------------------
-numberOfResidualBlocks = 4 # TODO: This can be increased
-numberOfChannels = 64 # TODO: Increase this for actual model # Number of channels in residual blocks
-dropoutRate = 0.1
+# Policyhead:
+policyHeadFilters = 32
 
-
-
+# State: 
+height, width = 6, 7
+# Can be set to something other than 1 if the model should receive old maps
+numberOfMapsPerPlayer = 1 

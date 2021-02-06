@@ -1,211 +1,228 @@
+from numba.core.decorators import njit
+from numpy.core.numeric import cross
+from utils import loadLatetestModel, saveModel
+from evaluate import evaluateModel
 from typing import List
-from state import checkIfGameIsWon, getAvailableMoves, makeMove, getStringRepresentation
-from model import Net, criterion, device, saveModel, loadLatetestModel, ResidualBlock
-from config import *
-from mcts import MontecarloTreeSearch, Node, getAction
-import numpy as np
-import os
 import torch
-import copy 
-from torch.optim import Adam, SGD
-from copy import deepcopy as dc
+from torch import nn, Tensor
+from torch.nn.modules.loss import CrossEntropyLoss
+import torch.nn.functional as F
+from torch.optim import Adam
+from model import Net, device
+from config import learningRate, disableValueHead, numberOfGames, batchSize, epochs, rooloutsDuringTraining, iterations, trainingOnGPU, width, mctsGPU, Window
+from state import generateEmptyState, makeMove, checkIfGameIsWon, flipGameState
+from numpy import random
+from mcts import MCTS
+import numpy as np
+from tqdm import tqdm, trange
+from logger import info, error
 
-def playGame (state: np.array, m1: Net, m2: Net, mctsSimulations: int) -> int:
-    """ Returns 1 if m1 won the game, 0 if its a draw and -1 if m2 won """
-    turn = 1
+# For debuging & testing:
+from state import getStringRepresentation
+from time import time 
+
+mse = nn.MSELoss()
+
+def crossEntropy (pred: Tensor, softTargets: Tensor) -> float:
+    # TODO: There is something wrong with this loss function
+    return torch.mean(torch.sum(-softTargets * F.log_softmax(pred, dim = 1), 1))
     
-    while (checkIfGameIsWon(state) == -1):
-        if ((turn % 2) == 0): 
-            # M1 plays a move
-            state = -makeMove(state, getAction(state.copy(), mctsSimulations, m1)) # Now state is from the view of the other player
-            
-        else:
-            # M2 plays a move
-            state = -makeMove(state, getAction(state.copy(), mctsSimulations, m2)) # Now state is from the view of the other player
-            
-        turn += 1
-        # print(getStringRepresentation(state))
+def criterion (output: (Tensor), target: (Tensor)) -> Tensor:
+    """ Computes the loss using the output & target """
+    valueLoss = mse(output[1], target[1])
+    policyLoss = mse(output[0], target[0]) # CROSS ENTROPY: -(target[0] * torch.log(output[0])).sum(dim = 1).mean()
+    return valueLoss + policyLoss
+
+def assignRewards(datapoints: List[np.array], reward: float) -> List[np.array]:
+    """ Assigns the reward to each data point """
+    n = len(datapoints)
     
-    # print(getStringRepresentation(state))
-    # Check who won or drew the game.
-    return checkIfGameIsWon(state) if (turn % 2 == 0) else -checkIfGameIsWon(state)
-
-def evaluateModel (model: Net, mctsSimulations: int = 25) -> int:
-    """ Tests a model against the current best """
-    score = 0
-    best = loadLatetestModel()
-    if (gpu == True): 
-        # print("Model was moved!")
-        best.cuda() # Load the model on gpu if gpu is set to true
-    state = np.zeros((6, 7), dtype = "float32")
-    for idx in range(state.shape[1]): # Test a position at each starting position
-        s = -makeMove(state.copy(), idx)
-        # print(getStringRepresentation(s))
-        
-        score += playGame(s.copy(), model, best, mctsSimulations)
-        score -= playGame(s.copy(), best, model, mctsSimulations)
-        
-    return score   
+    for i in range(n):
+        # print(getStringRepresentation(datapoints[i][0]), f"\nreward: {reward}", "\n")
+        datapoints[n - i - 1][-1] = reward
+        reward = -reward # The next state will be from the other players view (thus -reward)
     
-def createTrainingDataset (model: Net, numberOfGames: int = 100, mctsSimulations: int = 25) -> List[List[np.array]]:
-    """ Creates a training dataset for the model """
-    model.eval() # Set model to eval mode
-    dataset = []
-    for _ in range(numberOfGames): # Create n games, to train the neural network upon
-        dataset += executeEpisode(np.zeros((6, 7), dtype = "float32"), model, mctsSimulations)
-    return dataset
+    return datapoints
 
-def assignRewards (examples: List[List[np.array]], reward: float) -> List[List[np.array]]:
-    """" Loop through the examples and assign them the reward """
-    n = len(examples)
-    for i in reversed(range(n)): # Loop through the examples backwards
-        if ((i % 2) != (n % 2)): # NOTE: The rewards are converted to match the output of the neural network
-            examples[i][-1] = np.array([[-reward]], dtype = "float32") # This player lost the game
-        else: 
-            examples[i][-1] = np.array([[reward]], dtype = "float32") # This player won the game
-    return examples
-
-def addMirrorsToExamples (examples: List[List[np.array]]) -> List[List[np.array]]:
-    """ Takes a list of examples and adds the mirror image of each state to the dataset """
-    # 1. Create a list of mirrors
+def addMirrorImages (datapoints: List[np.array]) -> List[np.array]: # TODO: Could be added to optimize training (amount of data needed vs learning)
+    """ Adds the mirror images to the training data, thus increasing the number of datapoints pr. iteration """
+    # NOTE: This could be destabilizing training
     mirrors = []
-    for ex in examples:
-        mirrors.append([np.flip(ex[0], 1), ex[1], ex[2]])
     
-    # 2. Concatenate results    
-    result = mirrors + examples
-    np.random.shuffle(result) # Shuffle results for better learning
-    return result
-    
-def executeEpisode (state: np.array, model: Net, mctsSimulations: int) -> List[List[np.array]]:
-    """ Executes an episode and returns """ 
-    examples = []
-    while True:
-        root = MontecarloTreeSearch(state.copy(), mctsSimulations, model)
-        examples.append([state, root.probabilities * getAvailableMoves(state), None])
-        action = root.selectAction(1) # NOTE: This should be increased during training 
-        state = makeMove(state, action)
-        
-        reward = checkIfGameIsWon(state)
-        if (reward != -1):
-            # The game is ether won or drawn
-            examples.append([state, np.zeros((1, 7), dtype = "float32"), None])
-            return addMirrorsToExamples(assignRewards(examples, reward))
-        else:
-            # The game is not over yet
-            state *= -1
+    for d in datapoints:
+        mirrors.append([flipGameState(d[0]), np.flip(d[1], axis = 1), d[2]])
 
-def train (model: Net, previousIteration: int = 0, epochs: int = 4_000, iterations: int = 10, gamesPerIterations: int = 50, mctsSimulations: int = 25) -> Net:
-    """ Trains a neural network to play connect 4, using the alpha zero algorithm """
-    # Save the best model for evaluation of updated models
-    improvement = False
-    for iteration in range(iterations):
-        # Initialize iteration
-        print(f"\nAt iteration {iteration + 1} / {iterations}")
-        if (iteration != 0 and improvement == False):
-            # Load the latest model i the last model did not improve it's score.
-            print(" + Loading the best model from disk.")
-            model = loadLatetestModel()
-            if (gpu == True):
-                model.cuda()
-        
-        # Create dataset
-        print(" + Creating dataset")
-        dataset = createTrainingDataset(model, numberOfGames = gamesPerIterations, mctsSimulations = mctsSimulations)
-        print(f"    - Created a dataset of {len(dataset)} datapoints.")
-        
-        # Update model weights
-        print(" + Updating model weights:")
-        model = updateWeights(model, epochs, dataset)
-        
-        # Pit the models against each other
-        print(" + Evaluating model:")
-        score = evaluateModel(model, mctsSimulations = mctsSimulations)
-        print(f"    - score: {score}")
-        if (score > 0): 
-            saveModel(model, str(iteration + 1 + previousIteration) + ".pt")
-            improvement = True
-        else:
-            if (score == 0):
-                improvement = True
-            else:
-                improvement = False
+    return datapoints + mirrors
+
+def executeEpisode (mcts: MCTS) -> List[np.array]:
+    """ Plays a game with the neural network while storing the states as well as the actual policy vectors """
+    datapoints = []
+    state = generateEmptyState()
     
-    return loadLatetestModel()
+    while True:
+        for _ in range(rooloutsDuringTraining):
+            mcts.search(state)
         
-def convertDatasetToNumpyArrays (dataset: List[List[np.array]]) -> (np.array):
-    """ Converts the training dataset to 3d tensors for the model """
+        probs = mcts.getActionProbs(state, rooloutsDuringTraining)
+        datapoints.append([state, probs, None]) 
+        probs = probs.flatten()
+        move = random.choice(len(probs), p = probs)
+        state = makeMove(state, move)
+        reward = checkIfGameIsWon(state)
+        
+        if (reward != -1):
+            datapoints = addMirrorImages(assignRewards(datapoints, reward))
+            return datapoints
+        
+        mcts.reset() # Remove old mcts states
+
+def stackDataset (dataset: List[List[np.array]]) -> (np.array):
+    """ Stacks the numpy arrays """
     arrays = []
     for idx in range(len(dataset[0])):
         arrays.append([item[idx] for item in dataset])
+    
+    return tuple([np.stack(array) for array in arrays])
 
-    arrays = [np.stack(array) for array in arrays]
-    return arrays[0], arrays[1], arrays[2]    
+def createDataset (model: Net, iteration: int) -> (np.array):
+    """ Creates new training dataset """
+    print("Creating dataset:")
+    # Initialize montecarlo tree search
+    mcts = MCTS(model, iteration = iteration)
     
-def updateWeights (model: Net, epochs: int, dataset: List[List[np.array]]) -> Net:
-    """ Creates a copy of the network, updates it's weights and returns """  
-    # 1. Convert dataset
-    s, p, r = convertDatasetToNumpyArrays(dataset)
-    
-    # 1.1 Move datasets & model to gpu
-    if (gpu == True):
-        states = torch.from_numpy(s.reshape(s.shape[0], 1, s.shape[1], s.shape[2])).float().to(model.device)
-        probs = torch.from_numpy(p.reshape(p.shape[0], p.shape[2])).float().to(model.device)
-        rewards = torch.from_numpy(r.reshape(r.shape[0], r.shape[2])).float().to(model.device)
+    # Generate training data
+    dataset = []
+    for _ in tqdm(range(numberOfGames), unit = "game"):
+        dataset += executeEpisode(mcts)
+        mcts.reset() # Remove old states in mcts
         
-    else:
-        states = torch.from_numpy(s.reshape(s.shape[0], 1, s.shape[1], s.shape[2])).float()
-        probs = torch.from_numpy(p.reshape(p.shape[0], p.shape[2])).float()
-        rewards = torch.from_numpy(r.reshape(r.shape[0], r.shape[2])).float()
+    # Shuffle for better training
+    info(f"Created dataset of {len(dataset)} datapoints.")
+    return stackDataset(dataset)
+
+def convertTrainingDataToTensors (dataset: List[np.array]) -> (torch.Tensor):
+    """ Converts a dataset of states, policies and rewards into torch tensors used for training """
+    tensors = [torch.from_numpy(array).float() for array in dataset]
     
-    # 1.2 Set model to training mode 
+    # Move arrays to gpu if needed
+    if (trainingOnGPU == True):
+        for i in range(3):
+            tensors[i] = tensors[i].to(device)
+
+    # Reshape some of the tensors
+    n = len(tensors[0])
+    states = tensors[0]
+    probs = torch.reshape(tensors[1], (n, width))
+    rewards = torch.reshape(tensors[2], (n, 1))
+        
+    return states, probs, rewards
+
+def updateWeights (model: Net, states: torch.Tensor, probs: torch.Tensor, rewards: torch.Tensor) -> Net:
+    """ 
+        Updates the weights of the neural network based on the training data 
+            x: states,
+            ys: policies and rewards 
+    """
+    print("Updating weights:")
+    # 1.1 Set model to training mode 
     model.train()
     
-    # 2. Initialize optimizer
-    optimizer = Adam(model.parameters(), lr = learningRate)  
-    
-    # 3. Run training loop 
-    printTime = epochs // 5
-    for e in range(epochs):
-        permutation = torch.randperm(states.size()[0])
+    # 1.2 Move model to gpu or back to cpu
+    if (mctsGPU == False and trainingOnGPU == True): 
+        model.cuda()
         
-        totalLoss = 0
-        for idx in range(0, states.size()[0], batchSize):
+    elif (mctsGPU == True and trainingOnGPU == False):
+        model.cpu()
+    
+    # 2. Train the neural network
+    with trange(epochs, unit = "epoch") as t:
+        for e in t:
+            optimizer = Adam(model.parameters(), lr = learningRate)  
+            
+            permutation = torch.randperm(states.size()[0])
+            
+            totalValueLoss = 0
+            totalPolicyLoss = 0
+            for idx in range(0, states.size()[0], batchSize):
 
-            # 3.1 Load minibatch traning data
-            indices = permutation[idx:idx + batchSize]
-            s = states[indices]
-            p = probs[indices]
-            r = rewards[indices]
-            
-            # 3.2 Pass data though network & update weight using the optimizer
-            optimizer.zero_grad()
-            loss = criterion(model(s), (p, r))
-            loss.backward()
-            optimizer.step()
-            
-            # 3.3 Update the total loss
-            totalLoss += loss.item()
-        
-        if ((e + 1) % printTime == 0 or e == 0):
-            totalLoss /= states.size()[0] // batchSize # Get the average loss pr mini batch
-            print(f"    - At epoch {e + 1} / {epochs}, with loss: {totalLoss:.3f}")
-    
-    # Return model
+                # 2.1 Load minibatch traning data
+                indices = permutation[idx:idx + batchSize]
+                s = states[indices]
+                p = probs[indices]
+                r = rewards[indices]
+                
+                # 2.2 Pass data though network & update weights using the optimizer
+                optimizer.zero_grad()
+                predictions = model(s)
+                
+                # Check outputs for NaN
+                if (torch.sum(predictions[0] != predictions[0])): error("nan in policy")
+                elif (torch.sum(predictions[1] != predictions[1])): error("nan in value")
+                
+                policyLoss = mse(predictions[0], p) # TODO: Update this to another loss function
+                valueLoss = 0
+                if (disableValueHead == False):
+                    valueLoss = mse(predictions[1], r)
+                    loss = policyLoss + valueLoss
+                else: 
+                    loss = policyLoss
+                
+                loss.backward()
+                optimizer.step()
+                
+                # 2.3 Update the total loss
+                totalPolicyLoss += policyLoss.item()
+                if (disableValueHead == False):
+                    totalValueLoss += valueLoss.item()
+
+            # totalLoss /= (states.size()[0] // batchSize) if (states.size()[0] >= batchSize) else 1 # Get the average loss pr mini batch
+            if (disableValueHead == False):
+                t.set_postfix(pl = totalPolicyLoss, vl = totalValueLoss)
+            else: 
+                t.set_postfix(pl = totalPolicyLoss)
+                
+            if (e == epochs  - 1):
+                if (disableValueHead == False):
+                    info(f"Ended with losses: \n - value loss: {totalValueLoss:.2f}\n - policy loss: {totalPolicyLoss:.2f}")
+                else:
+                    info(f"Ended with losses: \n - policy loss: {totalPolicyLoss:.2f}")
+                    
+    if (mctsGPU == False and trainingOnGPU == True):
+        model.cpu()
+
     return model
 
-if __name__ == "__main__":
-    # TODO: Update the load model part
-    if (len(os.listdir(os.path.join(os.getcwd(), "models"))) != 0):
-        files = os.listdir(os.path.join(os.getcwd(), "models"))
-        previousIteration = sorted([int(f.split(".")[0]) for f in files])[-1]
-        model = loadLatetestModel()
-    else:    
-        model = Net()
-        previousIteration = 0
-        saveModel(model, "0.pt")
-    
-    if (gpu == True): model.cuda()
-    print(f"Initializing training of the {model.numberOfTrainableParameters} learnable parameters")
-    model = train(model, previousIteration = previousIteration, iterations = iterations, epochs = epochs, gamesPerIterations = newGamesPerIteration, mctsSimulations = mctsSimulations)
-    # print(executeEpisode(np.zeros((6, 7), dtype = "float32"), model, 25))
+def train(model: Net):
+    """ Trains the model """
+    saveModel(model, "0.pt")
+    datasets = []
+    for iteration in range(iterations):
+        print(f"\nAt iteration: {iteration + 1} / {iterations}")
+        info(f"\nAt iteration: {iteration + 1} / {iterations}")
+        
+        # Create new dataset and append it to datasets
+        states, probs, rewards = createDataset(model, iteration)
+        datasets.append([states, probs, rewards])
+        
+        # Remove old datapoints
+        while (len(datasets) > Window(iteration)):
+            datasets.pop(0)
+        
+        # Concatenate states, probs & rewards for training 
+        data = [[] for _ in range(3)]
+        for d in datasets:
+            for idx, val in enumerate(d):
+                data[idx].extend(val)
+                
+        data = [np.stack(d) for d in data]
+        states, probs, rewards = convertTrainingDataToTensors(data)
+        
+        model = updateWeights(model, states, probs, rewards)
+
+        result = evaluateModel(model)
+        if (result > 0): # the new model won more games
+            saveModel(model, f"{iteration + 1}.pt")
+
+if __name__ == '__main__':
+    model = Net()
+    train(model)
