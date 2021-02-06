@@ -10,13 +10,13 @@ from logger import info
 from config import numberOfEvaluationGames, rooloutsDuringEvaluation
 import random
 
-def generateInitialStates (states: List[np.array]) -> List[np.array]:
+def generateInitialStates () -> List[np.array]:
     """ Generates a list of initial states """
     # Play the first move
     initialStates = []
     for i in range(width):
         for j in range(width):
-            initialStates.append(makeMove(makeMove(states[i], i), j))
+            initialStates.append(makeMove(makeMove(generateEmptyState(), i), j))
 
     return initialStates
     
@@ -42,7 +42,7 @@ def playGame (state: np.array, m1: MCTS, m2: MCTS) -> int:
         # M2 played the last move
         return -checkIfGameIsWon(state)
 
-def evaluateModel (model: Net) -> int:
+def evaluateModel (model: Net) -> float:
     """ Evaluates a model against the model which was saved last. """
     print("Evaluating model:")
     best = loadLatetestModel()
@@ -53,9 +53,8 @@ def evaluateModel (model: Net) -> int:
     
     result = 0
     # Play games against the old model
-    states = generateInitialStates([generateEmptyState() for _ in range(width)])
+    states = generateInitialStates()
     for s in tqdm(random.sample(states, numberOfEvaluationGames)):
-        
         # Actually play the games
         result += playGame(s, modelMCTS, bestMCTS)
         result -= playGame(s, bestMCTS, modelMCTS)
@@ -64,6 +63,7 @@ def evaluateModel (model: Net) -> int:
         modelMCTS.reset()
         bestMCTS.reset()
     
-    # print(f" - Result from evaluation: {result}")
-    info(f"Result from evaluation: {result}")
-    return result
+    wins = numberOfEvaluationGames + result
+    percentage = wins / (2 * numberOfEvaluationGames) * 100
+    info(f"Result from evaluation: {percentage:.1f}%")
+    return percentage

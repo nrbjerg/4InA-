@@ -7,17 +7,17 @@ epsilon = 1e-8
 iterations = 20
 numberOfGames = 20
 rooloutsDuringTraining = 200
-# Enable value head halfway through the training process
+# Enable value head at this 
 enableValueHeadAfterIteration = iterations // 2
 
 # Training window
-def Window (iteration: int) -> int:
+def window (iteration: int) -> int:
     if (iteration < 3):
         return 2
     else:
         return iteration // 2
 
-learningRate = 0.001 # TODO: Implement adaptive learning rate
+learningRate = 0.01 # TODO: Implement adaptive learning rate
 epochs = 8
 batchSize = 100
 trainingOnGPU = True

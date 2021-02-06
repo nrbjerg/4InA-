@@ -9,7 +9,7 @@ from torch.nn.modules.loss import CrossEntropyLoss
 import torch.nn.functional as F
 from torch.optim import Adam
 from model import Net, device
-from config import learningRate, disableValueHead, numberOfGames, batchSize, epochs, rooloutsDuringTraining, iterations, trainingOnGPU, width, mctsGPU, Window
+from config import learningRate, disableValueHead, numberOfGames, batchSize, epochs, rooloutsDuringTraining, iterations, trainingOnGPU, width, mctsGPU, window
 from state import generateEmptyState, makeMove, checkIfGameIsWon, flipGameState
 from numpy import random
 from mcts import MCTS
@@ -192,7 +192,7 @@ def updateWeights (model: Net, states: torch.Tensor, probs: torch.Tensor, reward
 
     return model
 
-def train(model: Net):
+def train(model: Net, fromScratch: bool):
     """ Trains the model """
     saveModel(model, "0.pt")
     datasets = []
@@ -205,7 +205,7 @@ def train(model: Net):
         datasets.append([states, probs, rewards])
         
         # Remove old datapoints
-        while (len(datasets) > Window(iteration)):
+        while (len(datasets) > window(iteration)):
             datasets.pop(0)
         
         # Concatenate states, probs & rewards for training 
@@ -215,14 +215,20 @@ def train(model: Net):
                 data[idx].extend(val)
                 
         data = [np.stack(d) for d in data]
+        info(f"There is currently {data[0].shape[0]} datapoints in training data, from a maximum of {window(iteration)} games")
         states, probs, rewards = convertTrainingDataToTensors(data)
         
         model = updateWeights(model, states, probs, rewards)
 
-        result = evaluateModel(model)
-        if (result > 0): # the new model won more games
+        # Evaluate the model and get the percentage of games won by the new model
+        percentage = evaluateModel(model) 
+        if (percentage > 50.0):
             saveModel(model, f"{iteration + 1}.pt")
+        else:
+            datasets.pop() # Remove the last entry from the dataset 
+            model = loadLatetestModel() # Load better model
+            
 
 if __name__ == '__main__':
     model = Net()
-    train(model)
+    train(model, False)
