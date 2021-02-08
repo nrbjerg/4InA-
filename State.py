@@ -107,4 +107,10 @@ def getStringRepresentation (state: np.array) -> str:
                 lines[-1] += "o|"
             else:
                 lines[-1] += " |"
-    return "".join(lines)
+    return "".join(lines) + "\n" + "".join([" " + str(i) for i in range(width)]) + ""
+
+if (__name__ == "__main__"):
+    s = generateEmptyState()
+    s = makeMove(s, 1)
+    s = makeMove(s, 2)
+    print(s)

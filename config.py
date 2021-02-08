@@ -1,34 +1,38 @@
+from math import floor
+
 # MCTS: 
-Cpuct = 3.0
+Cpuct = 1.0
 mctsGPU = True
 epsilon = 1e-8
 
 # Training:
-iterations = 20
+iterations = 40
 numberOfGames = 20
-rooloutsDuringTraining = 200
+rooloutsDuringTraining = 32
+tau = 10 # After this many moves, the moves will be deterministic.
+
 # Enable value head at this 
-enableValueHeadAfterIteration = iterations // 2
+enableValueHeadAfterIteration = iterations - (iterations // 2)
 
 # Training window
 def window (iteration: int) -> int:
-    if (iteration < 3):
+    if (iteration < 8):
         return 2
     else:
-        return iteration // 2
+        return int(round(iteration ** (1.0 / 3)))
 
-learningRate = 0.01 # TODO: Implement adaptive learning rate
-epochs = 8
-batchSize = 100
+learningRate = 0.001 
+epochs = 10
+batchSize = 64
 trainingOnGPU = True
 
 # Evaluation:
 numberOfEvaluationGames = 49 # Per player (max 49.)
-rooloutsDuringEvaluation = 32
+rooloutsDuringEvaluation = 16
 
 # Model:
-numberOfFilters = 128 
-numberOfResidualBlocks = 4 # TRAINING: INCREASE
+numberOfFilters = 128
+numberOfResidualBlocks = 16
 numberOfNeurons = 256 # In the heads of the networks 
 performBatchNorm = True
 dropoutRate = 0.3
@@ -42,5 +46,4 @@ policyHeadFilters = 32
 
 # State: 
 height, width = 6, 7
-# Can be set to something other than 1 if the model should receive old maps
-numberOfMapsPerPlayer = 1 
+numberOfMapsPerPlayer = 2

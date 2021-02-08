@@ -2,7 +2,7 @@ from typing import Tuple
 import numpy as np 
 from model import Net, device
 from state import checkIfGameIsWon, flipPlayer, generateEmptyState, makeMove, validMoves
-from config import Cpuct, enableValueHeadAfterIteration, rooloutsDuringTraining, width, height, mctsGPU, numberOfMapsPerPlayer, epsilon
+from config import Cpuct, enableValueHeadAfterIteration, rooloutsDuringTraining, width, height, mctsGPU, numberOfMapsPerPlayer, epsilon, disableValueHead
 import torch
 from logger import *
 
@@ -96,7 +96,7 @@ class MCTS:
             self.Vs[s] = valids
             self.Ns[s] = 0
             
-            if (self.iteration > enableValueHeadAfterIteration):
+            if (disableValueHead == False and self.iteration > enableValueHeadAfterIteration):
                 return -v # This is in relation to the current player, therefore the value that should be backpropagated is -v
             else: 
                 return 0 # Enable value head after a couple of iterations 
@@ -112,7 +112,7 @@ class MCTS:
                     u = self.Qsa[(s, a)] + Cpuct * prior * np.sqrt(self.Ns[s]) /  (1 + self.Nsa[(s, a)])
                 
                 else:
-                    # When Q = 0
+                    # When Qsa = 0
                     u = Cpuct * prior * np.sqrt(self.Ns[s] + epsilon)
                 
                 if (u > best["score"]):

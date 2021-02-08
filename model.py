@@ -1,7 +1,7 @@
 import torch 
 from torch import nn
 import torch.nn.functional as F
-from config import numberOfResidualBlocks, disableValueHead, numberOfFilters, dropoutRate, numberOfMapsPerPlayer, numberOfNeurons, valueHeadFilters, policyHeadFilters, performBatchNorm
+from config import width, height, numberOfResidualBlocks, disableValueHead, numberOfFilters, dropoutRate, numberOfMapsPerPlayer, numberOfNeurons, valueHeadFilters, policyHeadFilters, performBatchNorm
 from torch import Tensor
 
 device = torch.device('cuda' if torch.cuda.is_available() else "cpu")
@@ -36,7 +36,7 @@ class ValueHead (nn.Module):
         self.conv1 = nn.Conv2d(numberOfFilters, valueHeadFilters, 1)
         self.bn1 = nn.BatchNorm2d(valueHeadFilters)
         self.do1 = nn.Dropout(p = dropoutRate)
-        self.h1 = nn.Linear(valueHeadFilters * 7 * 8, numberOfNeurons)
+        self.h1 = nn.Linear(valueHeadFilters * (width + 1) * (height + 1), numberOfNeurons)
         self.do2 = nn.Dropout(p = dropoutRate)
         self.h2 = nn.Linear(numberOfNeurons, 1)
     
@@ -55,7 +55,7 @@ class PolicyHead (nn.Module):
         self.conv1 = nn.Conv2d(numberOfFilters, policyHeadFilters, 1)
         self.bn1 = nn.BatchNorm2d(policyHeadFilters)
         self.do1 = nn.Dropout(p = dropoutRate)
-        self.h1 = nn.Linear(policyHeadFilters * 7 * 8, numberOfNeurons)
+        self.h1 = nn.Linear(policyHeadFilters * (width + 1) * (height + 1), numberOfNeurons)
         self.do2 = nn.Dropout(p = dropoutRate)
         self.h2 = nn.Linear(numberOfNeurons, 7)
         
@@ -88,6 +88,7 @@ class Net (nn.Module):
         x = F.relu(self.bn1(self.conv1(x)))
         for r in self.residualBlocks:
             x = r(x)
+            
         # Pass the data through value head and policy head
         p = self.policyHead(x)
         if (disableValueHead == False):

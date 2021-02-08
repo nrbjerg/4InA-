@@ -2,10 +2,10 @@ from state import *
 from mcts import MCTS
 from utils import loadLatetestModel
 from model import Net
-from config import rooloutsDuringEvaluation
+from config import rooloutsDuringTraining
 
 state = generateEmptyState()
-mcts = MCTS(loadLatetestModel())
+mcts = MCTS(loadLatetestModel()[0])
 
 while (checkIfGameIsWon(state) == -1):
     print(getStringRepresentation(state), "\n")
@@ -16,6 +16,6 @@ while (checkIfGameIsWon(state) == -1):
             move = int(input("Your input was invalid, please input new idx: "))
         state = makeMove(state, move)
     else:
-        state = makeMove(state, mcts.getMove(state, rooloutsDuringEvaluation))
+        state = makeMove(state, mcts.getMove(state, rooloutsDuringTraining))
     
     print(getStringRepresentation(state))

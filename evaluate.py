@@ -54,7 +54,7 @@ def playGame (state: np.array, m1: MCTS, m2: MCTS, w: int, l: int) -> Tuple[int]
         return (w, l + reward)
 
 
-def evaluateModel (model: Net) -> float:
+def evaluateModel (model: Net, iteration: int) -> float:
     """ 
         Creates two MCTS trees, one for the model passed as an argument, and one for
         the model loaded by the loadLatestModel function. It then pits them against each other.
@@ -65,8 +65,8 @@ def evaluateModel (model: Net) -> float:
     best = loadLatetestModel()[0]
     
     # Initialize search trees 
-    bestMCTS = MCTS(best)
-    modelMCTS = MCTS(model)
+    bestMCTS = MCTS(best, iteration = iteration)
+    modelMCTS = MCTS(model, iteration = iteration)
     
     # Play games against the old model
     wins, losses = 0, 0
@@ -79,5 +79,5 @@ def evaluateModel (model: Net) -> float:
     # Compute the winrate
     winrate = (wins / (2 * numberOfEvaluationGames)) * 100
           
-    info(f"Winrate during evaluation : {winrate:.1f}%")
+    info(f"Winrate during evaluation : {winrate:.1f} %")
     return winrate

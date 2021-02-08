@@ -1,3 +1,4 @@
+from typing import Tuple
 import torch
 from model import Net
 import os, shutil
@@ -27,13 +28,21 @@ def loadModel(filename: str) -> Net:
     """ Loads a model from the models directory """
     return torch.load(os.path.join(os.getcwd(), "models", filename))
 
-def loadLatetestModel () -> Net:
-    """ Loads the latest model from the models directory """
+def loadLatetestModel () -> Tuple[Net, int]:
+    """ Loads the latest model from the models directory (if no model is present, a new model is initialized) """
     files = os.listdir(os.path.join(os.getcwd(), "models"))
-    file = str(sorted([int(f.split(".")[0]) for f in files])[-1]) + ".pt"
-    model = loadModel(file)
-    return model
+    try:
+        iteration = sorted([int(f.split(".")[0]) for f in files])[-1]
+        file = str(iteration) + ".pt"
+        model = loadModel(file)
+        return (model, iteration)
+    except IndexError: # Initialize a new network if the models directory is empty
+        return (Net(), 0)
 
 if (__name__ == "__main__"):
     resetDirectory("./models")
     resetDirectory("./logs")
+    try:
+        os.remove("data.json")
+    except FileNotFoundError:
+        pass

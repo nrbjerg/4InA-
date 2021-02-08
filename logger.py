@@ -13,6 +13,3 @@ def warning (msg: str):
 
 def error (msg: str):
     log("error.txt", msg)
-    
-from utils import resetDirectory
-resetDirectory("./logs")
