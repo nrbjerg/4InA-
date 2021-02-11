@@ -2,7 +2,7 @@ from typing import List, Tuple
 from model import Net
 from state import *
 from mcts import MCTS
-from utils import loadLatetestModel
+from utils import loadLatetestModel, loadModel
 import numpy as np
 from config import width
 from tqdm import tqdm
@@ -53,8 +53,7 @@ def playGame (state: np.array, m1: MCTS, m2: MCTS, w: int, l: int) -> Tuple[int]
         # M2 played the last move
         return (w, l + reward)
 
-
-def evaluateModel (model: Net, iteration: int) -> float:
+def evaluateModel (model: Net, iteration: int, fast: bool = False, opponent: Net = None) -> float:
     """ 
         Creates two MCTS trees, one for the model passed as an argument, and one for
         the model loaded by the loadLatestModel function. It then pits them against each other.
@@ -65,19 +64,31 @@ def evaluateModel (model: Net, iteration: int) -> float:
     best = loadLatetestModel()[0]
     
     # Initialize search trees 
-    bestMCTS = MCTS(best, iteration = iteration)
+    if (opponent == None):
+        bestMCTS = MCTS(best, iteration = iteration)
+    else:
+        bestMCTS = MCTS(opponent, iteration = iteration)
+        
     modelMCTS = MCTS(model, iteration = iteration)
     
     # Play games against the old model
     wins, losses = 0, 0
-    states = generateInitialStates()
-    for s in tqdm(random.sample(states, numberOfEvaluationGames)):
+    if (fast == False):
+        states = generateInitialStates()
+    else:
+        states = [makeMove(generateEmptyState(), idx) for idx in range(7)]
+        
+    for s in tqdm(random.sample(states, (numberOfEvaluationGames if (fast == False) else 7))):
         # Actually play the games
-        wins, losses = playGame(s, modelMCTS, bestMCTS, wins, losses)
-        losses, wins = playGame(s, bestMCTS, modelMCTS, losses, wins)
+        wins, losses = playGame(s.copy(), modelMCTS, bestMCTS, wins, losses)
+        losses, wins = playGame(s.copy(), bestMCTS, modelMCTS, losses, wins)
 
     # Compute the winrate
-    winrate = (wins / (2 * numberOfEvaluationGames)) * 100
+    winrate = round((wins / (2 * (numberOfEvaluationGames if (fast == False) else 7))) * 100, 1)
           
     info(f"Winrate during evaluation : {winrate:.1f} %")
     return winrate
+      
+if (__name__ == "__main__"):
+    print(evaluateModel(loadModel("0.pt"), 0, fast = True))
+    print(evaluateModel(loadModel("0.pt"), 200, fast = True))

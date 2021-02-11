@@ -1,5 +1,4 @@
 /__pycache__
-/misc
-/dump
+/private
 /logs/**
 /models/**

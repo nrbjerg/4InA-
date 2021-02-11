@@ -132,14 +132,14 @@ def saveDataset (dataset: List[List[np.array]]):
                                 "r": d[2].tolist()}
     
     # Save the data to the data.json file
-    with open("data.json", "w") as jsonFile:
+    with open("data/data.json", "w") as jsonFile:
         json.dump(jsonObject, jsonFile)
         
 def loadDataset () -> List[List[np.array]]:
     """ Loads the dataset from the datasets directory. """
     # Open json file and load it's contents
     try:
-        with open("data.json", "r") as jsonFile:
+        with open("data/data.json", "r") as jsonFile:
             data = json.load(jsonFile)
             
             dataset = []
@@ -151,6 +151,3 @@ def loadDataset () -> List[List[np.array]]:
             return dataset
     except FileNotFoundError:
         return []
-    
-if (__name__ == "__main__"):
-    print(loadDataset())

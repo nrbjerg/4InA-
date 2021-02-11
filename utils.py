@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import List, Tuple
 import torch
 from model import Net
 import os, shutil
@@ -16,7 +16,15 @@ def resetDirectory (folder: str) -> None:
         except Exception as e:
             print('Failed to delete %s. Reason: %s' % (file_path, e))
 
-def saveModel (model: Net, filename: str):
+def fileNumbersInDirectory (folder: str) -> List[str]:
+    """ Returns a list of files in the folder """
+    files = os.listdir(folder)
+    numbers = [] 
+    for f in files:
+        numbers.append((f.split(".")[0]))
+    return sorted(numbers)
+
+def saveModel (model, filename: str):
     """ Saves the current model """
     if (not os.path.exists("models")):
         os.mkdir("models")
@@ -24,7 +32,7 @@ def saveModel (model: Net, filename: str):
     filepath = os.path.join(os.getcwd(), "models", filename)
     torch.save(model, filepath)
 
-def loadModel(filename: str) -> Net:
+def loadModel(filename: str):
     """ Loads a model from the models directory """
     return torch.load(os.path.join(os.getcwd(), "models", filename))
 

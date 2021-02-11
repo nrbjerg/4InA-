@@ -1,6 +1,0 @@
-MCTS: 
-    - Look for speedups (Maybe some of the methods can be improved using numba)
-    - Figure out a way to run multiple mcts instances at the same time, 
-    storing each state in a queue for evaluation by the network 
-Training:
-    - Adaptive learning rate

@@ -24,17 +24,16 @@ def updateWeights (model: Net, states: torch.Tensor, probs: torch.Tensor, reward
             ys: policies and rewards 
     """
     print("Updating weights:")
-    # 1.1 Set model to training mode 
     model.train()
     
-    # 1.2 Move model to gpu or back to cpu
+    # Move model to gpu or back to cpu
     if (mctsGPU == False and trainingOnGPU == True): 
         model.cuda()
         
     elif (mctsGPU == True and trainingOnGPU == False):
         model.cpu()
     
-    # 2. Train the neural network
+    # Train the neural network
     with trange(epochs, unit = "epoch") as t:
         for e in t:
             optimizer = Adam(model.parameters(), lr = learningRate)  
@@ -71,7 +70,7 @@ def updateWeights (model: Net, states: torch.Tensor, probs: torch.Tensor, reward
                 loss.backward()
                 optimizer.step()
                 
-                # 2.3 Update the total loss
+                # Update the total loss
                 policyLoss += policyLoss.item()
                 if (disableValueHead == False):
                     valueLoss += valueLoss.item()
@@ -129,6 +128,7 @@ def train (model: Net, startingIteration: int):
         percentage = evaluateModel(model, iteration) 
         
         if (percentage >= 50.0):
+            print("Evaluation: New model won.")
             saveModel(model, f"{iteration + 1}.pt")
         else:
             datasets.pop() # Remove the last entry from the dataset 

@@ -6,10 +6,10 @@ mctsGPU = True
 epsilon = 1e-8
 
 # Training:
-iterations = 40
-numberOfGames = 20
-rooloutsDuringTraining = 32
-tau = 10 # After this many moves, the moves will be deterministic.
+iterations = 200
+numberOfGames = 10
+rooloutsDuringTraining = 24
+tau = 8 # After this many moves, the moves will be deterministic.
 
 # Enable value head at this 
 enableValueHeadAfterIteration = iterations - (iterations // 2)
