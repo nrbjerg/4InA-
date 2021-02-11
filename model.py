@@ -1,7 +1,7 @@
 import torch 
 from torch import nn
 import torch.nn.functional as F
-from config import width, height, numberOfResidualBlocks, disableValueHead, numberOfFilters, dropoutRate, numberOfMapsPerPlayer, numberOfNeurons, valueHeadFilters, policyHeadFilters, performBatchNorm
+from config import width, height, numberOfResidualBlocks, disableValueHead, numberOfFilters, dropoutRate, numberOfHiddenLayers, numberOfMapsPerPlayer, numberOfNeurons, valueHeadFilters, policyHeadFilters, performBatchNorm
 from torch import Tensor
 
 device = torch.device('cuda' if torch.cuda.is_available() else "cpu")
@@ -38,22 +38,26 @@ class ValueHead (nn.Module):
         self.bn1 = nn.BatchNorm2d(valueHeadFilters)
         
         # Dropout layers
-        self.do1 = nn.Dropout(p = dropoutRate)
-        self.do2 = nn.Dropout(p = dropoutRate)
-        self.do3 = nn.Dropout(p = dropoutRate)
+        self.dropoutLayers = nn.ModuleList([nn.Dropout(p = dropoutRate) for _ in range(numberOfHiddenLayers)])
         
         # Hidden layers
-        self.h1 = nn.Linear(valueHeadFilters * (width + 1) * (height + 1), numberOfNeurons)
-        self.h2 = nn.Linear(numberOfNeurons, numberOfNeurons)
-        self.h3 = nn.Linear(numberOfNeurons, 1)
+        hiddenLayers = [nn.Linear(valueHeadFilters * (width + 1) * (height + 1), numberOfNeurons)]
+        for _ in range(numberOfHiddenLayers - 1):
+            hiddenLayers.append(nn.Linear(numberOfNeurons, numberOfNeurons))
+
+        hiddenLayers.append(nn.Linear(numberOfNeurons, 1))
     
+        self.hiddenLayers = nn.ModuleList(hiddenLayers)
+        
     def forward (self, x: Tensor) -> Tensor:
         """ Pass data through the value head of the network """
         x = F.relu(self.bn1(self.conv1(x)))
-        x = self.do1(torch.flatten(x, start_dim = 1))
-        x = self.do2(F.relu(self.h1(x)))
-        x = self.do3(F.relu(self.h2(x)))
-        return torch.tanh(self.h3(x))
+        x = self.dropoutLayers[0](torch.flatten(x, start_dim = 1))
+        
+        for do, h in zip(self.dropoutLayers[1:], self.hiddenLayers[:-1]):
+            x = do(F.relu(h(x)))
+
+        return torch.tanh(self.hiddenLayers[-1](x))
         
 class PolicyHead (nn.Module):
     
@@ -65,22 +69,27 @@ class PolicyHead (nn.Module):
         self.bn1 = nn.BatchNorm2d(policyHeadFilters)
         
         # Dropout layers
-        self.do1 = nn.Dropout(p = dropoutRate)
-        self.do2 = nn.Dropout(p = dropoutRate)
-        self.do3 = nn.Dropout(p = dropoutRate)
+        self.dropoutLayers = nn.ModuleList([nn.Dropout(p = dropoutRate) for _ in range(numberOfHiddenLayers)])
         
         # Hidden layers
-        self.h1 = nn.Linear(policyHeadFilters * (width + 1) * (height + 1), numberOfNeurons)
-        self.h2 = nn.Linear(numberOfNeurons, numberOfNeurons)
-        self.h3 = nn.Linear(numberOfNeurons, 7)
+        hiddenLayers = [nn.Linear(policyHeadFilters * (width + 1) * (height + 1), numberOfNeurons)]
+        for _ in range(numberOfHiddenLayers - 1):
+            hiddenLayers.append(nn.Linear(numberOfNeurons, numberOfNeurons))
+
+        hiddenLayers.append(nn.Linear(numberOfNeurons, 7))
+    
+        self.hiddenLayers = nn.ModuleList(hiddenLayers)
         
     def forward (self, x: Tensor) -> Tensor:
         """ Pass data through the policy head of the network """
         x = F.relu(self.bn1(self.conv1(x)))
-        x = self.do1(torch.flatten(x, start_dim = 1))
-        x = self.do2(F.relu(self.h1(x)))
-        x = self.do3(F.relu(self.h2(x)))
-        return torch.exp(F.log_softmax(self.h3(x), dim = -1))
+        x = self.dropoutLayers[0](torch.flatten(x, start_dim = 1))
+        
+        # Pass data through the hidden layers.
+        for do, h in zip(self.dropoutLayers[1:], self.hiddenLayers[:-1]):
+            x = do(F.relu(h(x)))
+
+        return torch.tanh(self.hiddenLayers[-1](x))
         
 class Net (nn.Module):
     

@@ -34,6 +34,7 @@ rooloutsDuringEvaluation = 16
 numberOfFilters = 256
 numberOfResidualBlocks = 16
 numberOfNeurons = 1024 # In the heads of the networks 
+numberOfHiddenLayers = 3
 performBatchNorm = True
 dropoutRate = 0.3
 disableValueHead = False
