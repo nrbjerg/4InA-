@@ -33,38 +33,54 @@ class ValueHead (nn.Module):
     def __init__ (self):
         """ Initializes the value head of the network """
         super(ValueHead, self).__init__()
+        # Convolutional filters
         self.conv1 = nn.Conv2d(numberOfFilters, valueHeadFilters, 1)
         self.bn1 = nn.BatchNorm2d(valueHeadFilters)
+        
+        # Dropout layers
         self.do1 = nn.Dropout(p = dropoutRate)
-        self.h1 = nn.Linear(valueHeadFilters * (width + 1) * (height + 1), numberOfNeurons)
         self.do2 = nn.Dropout(p = dropoutRate)
-        self.h2 = nn.Linear(numberOfNeurons, 1)
+        self.do3 = nn.Dropout(p = dropoutRate)
+        
+        # Hidden layers
+        self.h1 = nn.Linear(valueHeadFilters * (width + 1) * (height + 1), numberOfNeurons)
+        self.h2 = nn.Linear(numberOfNeurons, numberOfNeurons)
+        self.h3 = nn.Linear(numberOfNeurons, 1)
     
     def forward (self, x: Tensor) -> Tensor:
         """ Pass data through the value head of the network """
         x = F.relu(self.bn1(self.conv1(x)))
         x = self.do1(torch.flatten(x, start_dim = 1))
         x = self.do2(F.relu(self.h1(x)))
-        return torch.tanh(self.h2(x))
+        x = self.do3(F.relu(self.h2(x)))
+        return torch.tanh(self.h3(x))
         
 class PolicyHead (nn.Module):
     
     def __init__ (self):
         super(PolicyHead, self).__init__()
         """ Initializes the policy head of the network """
+        # Convolutional filters
         self.conv1 = nn.Conv2d(numberOfFilters, policyHeadFilters, 1)
         self.bn1 = nn.BatchNorm2d(policyHeadFilters)
+        
+        # Dropout layers
         self.do1 = nn.Dropout(p = dropoutRate)
-        self.h1 = nn.Linear(policyHeadFilters * (width + 1) * (height + 1), numberOfNeurons)
         self.do2 = nn.Dropout(p = dropoutRate)
-        self.h2 = nn.Linear(numberOfNeurons, 7)
+        self.do3 = nn.Dropout(p = dropoutRate)
+        
+        # Hidden layers
+        self.h1 = nn.Linear(policyHeadFilters * (width + 1) * (height + 1), numberOfNeurons)
+        self.h2 = nn.Linear(numberOfNeurons, numberOfNeurons)
+        self.h3 = nn.Linear(numberOfNeurons, 7)
         
     def forward (self, x: Tensor) -> Tensor:
         """ Pass data through the policy head of the network """
         x = F.relu(self.bn1(self.conv1(x)))
         x = self.do1(torch.flatten(x, start_dim = 1))
         x = self.do2(F.relu(self.h1(x)))
-        return torch.exp(F.log_softmax(self.h2(x), dim = -1))
+        x = self.do3(F.relu(self.h2(x)))
+        return torch.exp(F.log_softmax(self.h3(x), dim = -1))
         
 class Net (nn.Module):
     
