@@ -112,5 +112,5 @@ def getStringRepresentation (state: np.array) -> str:
 if (__name__ == "__main__"):
     s = generateEmptyState()
     s = makeMove(s, 1)
-    s = makeMove(s, 2)
+    # s = makeMove(s, 2)
     print(s)

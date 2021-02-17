@@ -24,8 +24,10 @@ class ResidualBlock (nn.Module):
         """ Pass the tensor x through the residual block """
         if (performBatchNorm == True):
             fx = self.bn2(self.conv2(F.relu(self.bn1(self.conv1(x)))))
+            
         else:
             fx = self.conv2(F.relu(self.conv1(x)))
+            
         return F.relu(fx + x)
 
 class ValueHead (nn.Module):
@@ -42,7 +44,7 @@ class ValueHead (nn.Module):
         
         # Hidden layers
         hiddenLayers = [nn.Linear(valueHeadFilters * (width + 1) * (height + 1), numberOfNeurons)]
-        for _ in range(numberOfHiddenLayers - 1):
+        for _ in range(numberOfHiddenLayers - 2):
             hiddenLayers.append(nn.Linear(numberOfNeurons, numberOfNeurons))
 
         hiddenLayers.append(nn.Linear(numberOfNeurons, 1))
@@ -51,9 +53,11 @@ class ValueHead (nn.Module):
         
     def forward (self, x: Tensor) -> Tensor:
         """ Pass data through the value head of the network """
+        # Pass through value filters
         x = F.relu(self.bn1(self.conv1(x)))
         x = self.dropoutLayers[0](torch.flatten(x, start_dim = 1))
         
+        # Pass through linear layers
         for do, h in zip(self.dropoutLayers[1:], self.hiddenLayers[:-1]):
             x = do(F.relu(h(x)))
 
@@ -73,14 +77,14 @@ class PolicyHead (nn.Module):
         
         # Hidden layers
         hiddenLayers = [nn.Linear(policyHeadFilters * (width + 1) * (height + 1), numberOfNeurons)]
-        for _ in range(numberOfHiddenLayers - 1):
+        for _ in range(numberOfHiddenLayers - 2):
             hiddenLayers.append(nn.Linear(numberOfNeurons, numberOfNeurons))
 
         hiddenLayers.append(nn.Linear(numberOfNeurons, 7))
     
         self.hiddenLayers = nn.ModuleList(hiddenLayers)
         
-    def forward (self, x: Tensor) -> Tensor:
+    def forward (self, x: Tensor, training: bool = False) -> Tensor:
         """ Pass data through the policy head of the network """
         x = F.relu(self.bn1(self.conv1(x)))
         x = self.dropoutLayers[0](torch.flatten(x, start_dim = 1))
@@ -89,7 +93,13 @@ class PolicyHead (nn.Module):
         for do, h in zip(self.dropoutLayers[1:], self.hiddenLayers[:-1]):
             x = do(F.relu(h(x)))
 
-        return torch.tanh(self.hiddenLayers[-1](x))
+        if (training == True):
+            # If training is true return the logits
+            return self.hiddenLayers[-1](x)
+        
+        else:
+            # If training is false return the policy vector
+            return torch.exp(torch.log_softmax(self.hiddenLayers[-1](x), dim = 1))
         
 class Net (nn.Module):
     
@@ -107,7 +117,7 @@ class Net (nn.Module):
         if (disableValueHead == False):
             self.valueHead = ValueHead()
         
-    def forward (self, x: Tensor) -> Tensor:
+    def forward (self, x: Tensor, training: bool = False) -> Tensor:
         """ Pass data through the network """
         # Pass the data through the residual part of the network
         x = F.relu(self.bn1(self.conv1(x)))
@@ -115,19 +125,21 @@ class Net (nn.Module):
             x = r(x)
             
         # Pass the data through value head and policy head
-        p = self.policyHead(x)
+        p = self.policyHead(x, training = training)
+        
         if (disableValueHead == False):
             v = self.valueHead(x)
             return (p, v) # [x, 7], [x, 1]
+        
         else:
             return (p, torch.zeros(p.shape[0], 1))
-        
     
     def numberOfParameters (self) -> int:
-        return sum([p.numel() for p in model.parameters()])
+        return sum([p.numel() for p in self.parameters()])
         
 if (__name__ == '__main__'):
     model = Net()
-    probs, rewards = model(torch.randn(10, 2 * numberOfMapsPerPlayer + 1, 6, 7))
-    print(probs, rewards)
+    t = torch.randn(10, 2 * numberOfMapsPerPlayer + 1, 6, 7)
+    print(model(t))
+    print(model(t, training = True))
     print(model.numberOfParameters())

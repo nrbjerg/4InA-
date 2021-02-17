@@ -11,6 +11,6 @@ The models was trained over 200 iterations, one iteration is:
 
 ## TODO:
 * Look for ways to speedup the MCTS algorithm
-    * Maybe run multiple mcts at a time with a single neural network for evalation and creating training dataset. (This could also improve GPU saturation)
+    * Maybe run multiple mcts at a time with a single neural network for evalation and creating training dataset. (This could improve GPU saturation)
 * Create vizualisation of the learning rates, eloes & winrates against the first model.
 * Create additional comments & documentation

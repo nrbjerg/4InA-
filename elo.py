@@ -93,4 +93,4 @@ def computeEloes (iterations: int):
             
         
 if (__name__ == "__main__"):
-    computeEloes(50)
+    computeEloes(100)

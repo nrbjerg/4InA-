@@ -6,10 +6,10 @@ mctsGPU = True
 epsilon = 1e-8
 
 # Training:
-iterations = 12
-numberOfGames = 32
-rooloutsDuringTraining = 50
-tau = 8 # After this many moves, the moves will be deterministic.
+iterations = 10
+numberOfGames = 10
+rooloutsDuringTraining = 32
+tau = 10 # After this many moves, the moves will be deterministic.
 
 # Enable value head at this 
 enableValueHeadAfterIteration = iterations - (iterations // 2)
@@ -34,7 +34,7 @@ rooloutsDuringEvaluation = 16
 numberOfFilters = 256
 numberOfResidualBlocks = 16
 numberOfNeurons = 1024 # In the heads of the networks 
-numberOfHiddenLayers = 3
+numberOfHiddenLayers = 2
 performBatchNorm = True
 dropoutRate = 0.3
 disableValueHead = False
@@ -47,4 +47,4 @@ policyHeadFilters = 32
 
 # State: 
 height, width = 6, 7
-numberOfMapsPerPlayer = 2
+numberOfMapsPerPlayer = 1

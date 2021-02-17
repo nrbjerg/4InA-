@@ -15,7 +15,7 @@ from data import createDataset, convertTrainingDataToTensors, saveDataset, loadD
 mse = nn.MSELoss()
 
 def crossEntropy (predictions: Tensor, targets: Tensor) -> float:
-    return -torch.sum(targets * F.log(predictions))
+    return torch.mean(-torch.sum(targets * torch.log_softmax(predictions, dim = 1), 1))
 
 def updateWeights (model: Net, states: torch.Tensor, probs: torch.Tensor, rewards: torch.Tensor) -> Net:
     """ 
@@ -40,8 +40,8 @@ def updateWeights (model: Net, states: torch.Tensor, probs: torch.Tensor, reward
             
             permutation = torch.randperm(states.size()[0])
             
-            valueLoss = 0
-            policyLoss = 0
+            vLoss = 0
+            pLoss = 0
             batches = 0
             for idx in range(0, states.size()[0], batchSize):
                 batches += 1
@@ -53,13 +53,13 @@ def updateWeights (model: Net, states: torch.Tensor, probs: torch.Tensor, reward
                 
                 # Pass data though network & update weights using the optimizer
                 optimizer.zero_grad()
-                predictions = model(s)
+                predictions = model(s, training = True)
                 
                 # Check outputs for NaN
                 if (torch.sum(predictions[0] != predictions[0])): error("nan in policy")
                 elif (torch.sum(predictions[1] != predictions[1])): error("nan in value")
                 
-                policyLoss = mse(predictions[0], p) # TODO: Update this to another loss function
+                policyLoss = crossEntropy(predictions[0], p) # TODO: Update this to another loss function
                 valueLoss = 0
                 if (disableValueHead == False):
                     valueLoss = mse(predictions[1], r)
@@ -71,25 +71,25 @@ def updateWeights (model: Net, states: torch.Tensor, probs: torch.Tensor, reward
                 optimizer.step()
                 
                 # Update the total loss
-                policyLoss += policyLoss.item()
+                pLoss += policyLoss.item()
                 if (disableValueHead == False):
-                    valueLoss += valueLoss.item()
+                    vLoss += valueLoss.item()
 
-            policyLoss /= batches
-            valueLoss /= batches
+            pLoss /= batches
+            vLoss /= batches
             
             # Update progres bar
             if (disableValueHead == False):
-                t.set_postfix(pl = policyLoss.item(), vl = valueLoss.item())
-            else: 
-                t.set_postfix(pl = policyLoss.item())
+                t.set_postfix(pl = pLoss, vl = vLoss)
+            else:
+                t.set_postfix(pl = pLoss)
             
             # Log information about the losses
             if (e == epochs  - 1):
                 if (disableValueHead == False):
-                    info(f"Ended with losses: \n - value loss: {valueLoss.item():.4f}\n - policy loss: {policyLoss.item():.4f}")
+                    info(f"Ended with losses: \n - value loss: {vLoss:.4f}\n - policy loss: {pLoss:.4f}")
                 else:
-                    info(f"Ended with losses: \n - policy loss: {policyLoss.item():.4f}")
+                    info(f"Ended with losses: \n - policy loss: {pLoss:.4f}")
                     
     if (mctsGPU == False and trainingOnGPU == True):
         model.cpu()
@@ -101,8 +101,8 @@ def train (model: Net, startingIteration: int):
     datasets = loadDataset() # Load the dataset if it's present in the directory
     
     for iteration in range(startingIteration, iterations + startingIteration):
-        print(f"\nAt iteration: {iteration + 1} / {iterations + startingIteration}")
-        info(f"At iteration: {iteration + 1}:")
+        print(f"\nAt iteration {iteration + 1} / {iterations + startingIteration}")
+        info(f"At iteration {iteration + 1}:")
         
         # Create new dataset and append it to datasets
         states, probs, rewards = createDataset(model, iteration - startingIteration)

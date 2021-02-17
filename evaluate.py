@@ -90,5 +90,5 @@ def evaluateModel (model: Net, iteration: int, fast: bool = False, opponent: Net
     return winrate
       
 if (__name__ == "__main__"):
-    print(evaluateModel(loadModel("0.pt"), 0, fast = True))
-    print(evaluateModel(loadModel("0.pt"), 200, fast = True))
+    print(evaluateModel(loadModel("0.pt"), 0, fast = False))
+    print(evaluateModel(loadModel("0.pt"), 200, fast = False))
