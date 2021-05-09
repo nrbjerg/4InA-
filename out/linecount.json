@@ -1,0 +1,203 @@
+{
+    "extension": "linecount",
+    "version": "0.1.7",
+    "workspace": "c:\\Users\\MSN\\source\\4InA-",
+    "linecount": [
+        {
+            "version": "0.1.7",
+            "counttime": "2021-04-19 20:35:33",
+            "filesum": 29,
+            "codesum": 770,
+            "commentsum": 137,
+            "blanksum": 290,
+            "filelist": [
+                {
+                    "blank": 0,
+                    "code": 3,
+                    "comment": 1,
+                    "filename": ".gitignore"
+                },
+                {
+                    "filename": "__pycache__\\config.cpython-38.pyc",
+                    "isbinaryfile": true,
+                    "blank": 0,
+                    "code": 0,
+                    "comment": 0
+                },
+                {
+                    "filename": "__pycache__\\data.cpython-38.pyc",
+                    "isbinaryfile": true,
+                    "blank": 0,
+                    "code": 0,
+                    "comment": 0
+                },
+                {
+                    "filename": "__pycache__\\elo.cpython-38.pyc",
+                    "isbinaryfile": true,
+                    "blank": 0,
+                    "code": 0,
+                    "comment": 0
+                },
+                {
+                    "filename": "__pycache__\\evaluate.cpython-38.pyc",
+                    "isbinaryfile": true,
+                    "blank": 0,
+                    "code": 0,
+                    "comment": 0
+                },
+                {
+                    "filename": "__pycache__\\logger.cpython-38.pyc",
+                    "isbinaryfile": true,
+                    "blank": 0,
+                    "code": 0,
+                    "comment": 0
+                },
+                {
+                    "filename": "__pycache__\\mcts.cpython-38.pyc",
+                    "isbinaryfile": true,
+                    "blank": 0,
+                    "code": 0,
+                    "comment": 0
+                },
+                {
+                    "filename": "__pycache__\\model.cpython-38.pyc",
+                    "isbinaryfile": true,
+                    "blank": 0,
+                    "code": 0,
+                    "comment": 0
+                },
+                {
+                    "filename": "__pycache__\\state.cpython-38.pyc",
+                    "isbinaryfile": true,
+                    "blank": 0,
+                    "code": 0,
+                    "comment": 0
+                },
+                {
+                    "filename": "__pycache__\\utils.cpython-38.pyc",
+                    "isbinaryfile": true,
+                    "blank": 0,
+                    "code": 0,
+                    "comment": 0
+                },
+                {
+                    "blank": 9,
+                    "code": 30,
+                    "comment": 12,
+                    "filename": "config.py"
+                },
+                {
+                    "blank": 32,
+                    "code": 79,
+                    "comment": 15,
+                    "filename": "data.py"
+                },
+                {
+                    "blank": 0,
+                    "code": 1,
+                    "comment": 0,
+                    "filename": "data\\data.json"
+                },
+                {
+                    "blank": 24,
+                    "code": 68,
+                    "comment": 10,
+                    "filename": "elo.py"
+                },
+                {
+                    "blank": 17,
+                    "code": 52,
+                    "comment": 9,
+                    "filename": "evaluate.py"
+                },
+                {
+                    "blank": 5,
+                    "code": 10,
+                    "comment": 0,
+                    "filename": "logger.py"
+                },
+                {
+                    "blank": 8,
+                    "code": 25,
+                    "comment": 0,
+                    "filename": "logs\\info.txt"
+                },
+                {
+                    "blank": 3,
+                    "code": 21,
+                    "comment": 0,
+                    "filename": "main.py"
+                },
+                {
+                    "blank": 46,
+                    "code": 101,
+                    "comment": 30,
+                    "filename": "mcts.py"
+                },
+                {
+                    "blank": 45,
+                    "code": 86,
+                    "comment": 18,
+                    "filename": "model.py"
+                },
+                {
+                    "filename": "models\\0.pt",
+                    "isbinaryfile": true,
+                    "blank": 0,
+                    "code": 0,
+                    "comment": 0
+                },
+                {
+                    "filename": "models\\1.pt",
+                    "isbinaryfile": true,
+                    "blank": 0,
+                    "code": 0,
+                    "comment": 0
+                },
+                {
+                    "filename": "models\\3.pt",
+                    "isbinaryfile": true,
+                    "blank": 0,
+                    "code": 0,
+                    "comment": 0
+                },
+                {
+                    "blank": 4,
+                    "code": 12,
+                    "comment": 0,
+                    "filename": "readme.md"
+                },
+                {
+                    "blank": 23,
+                    "code": 64,
+                    "comment": 9,
+                    "filename": "state.py"
+                },
+                {
+                    "blank": 37,
+                    "code": 97,
+                    "comment": 23,
+                    "filename": "train.py"
+                },
+                {
+                    "blank": 12,
+                    "code": 43,
+                    "comment": 2,
+                    "filename": "utils.py"
+                },
+                {
+                    "blank": 20,
+                    "code": 60,
+                    "comment": 5,
+                    "filename": "vizualize.py"
+                },
+                {
+                    "blank": 5,
+                    "code": 18,
+                    "comment": 3,
+                    "filename": "winrates.py"
+                }
+            ]
+        }
+    ]
+}

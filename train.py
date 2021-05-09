@@ -140,8 +140,18 @@ def train (model: Net, startingIteration: int):
     saveDataset(datasets) 
 
 if __name__ == '__main__':
+    
     model, iteration = loadLatetestModel()
     if (iteration == 0):
         saveModel(model, "0.pt")
-        
+    
     train(model, iteration)
+    # Code for profiling: 
+    # import sys 
+    # import cProfile
+    
+    # sys.stdout = open("profile.txt", "w")
+    
+    # cProfile.run("train(model, iteration)")
+    
+    # sys.stdout.close()

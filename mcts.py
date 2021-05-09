@@ -1,7 +1,7 @@
-from typing import Tuple
+from typing import List, Tuple
 import numpy as np 
 from model import Net, device
-from state import checkIfGameIsWon, flipPlayer, generateEmptyState, makeMove, validMoves
+from state import checkIfGameIsWon, generateEmptyState, makeMove, validMoves
 from config import Cpuct, enableValueHeadAfterIteration, rooloutsDuringTraining, width, height, mctsGPU, numberOfMapsPerPlayer, epsilon, disableValueHead
 import torch
 from logger import *
@@ -57,7 +57,7 @@ class MCTS:
             return probs
     
     def getMove (self, state: np.array, roolouts: int) -> int:
-        """ Returns the move recommended by the mcts """
+        """ Returns the moves recommended by mcts (with temperature = 0.0) """
         return np.argmax(self.getActionProbs(state, roolouts, temperature = 0.0))
     
     def predict (self, state: np.array, s: str) -> Tuple[np.array, float]:
@@ -100,7 +100,7 @@ class MCTS:
         
         if (s not in self.Ps): # We have hit a leaf node
             
-            # If the state has already been reached before (before the latest reset)
+            # If the state has already been reached before (before the latest reset, it's still a leaf node after all) 
             if (s in self.predictions): 
                 self.Ps[s], v = self.predictions[s]
             else:
@@ -113,7 +113,7 @@ class MCTS:
             if (sumOfProbs > 0): # Normalize the probs
                 self.Ps[s] /= sumOfProbs
             else:
-                # If all probs where but the state isn't terminal, give all valid moves equal probability
+                # If all probs where 0 but the state isn't terminal, give all valid moves equal probability
                 warning("Warning: all moves where masked... ")
                 self.Ps[s] = valids / np.sum(valids)
             

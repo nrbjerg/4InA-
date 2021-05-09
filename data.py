@@ -1,15 +1,18 @@
-from logger import error
 from mcts import MCTS
 from model import Net, device
 import torch
 from state import flipGameState, makeMove, generateEmptyState, checkIfGameIsWon
-from torch import from_numpy
 import numpy as np
 from numpy import random
-from typing import Any, List
+from typing import List
 from config import numberOfGames, rooloutsDuringTraining, width, height, trainingOnGPU, tau
 from tqdm import tqdm
 import json 
+import math
+
+def sigmoid (x: float) -> float:
+    # Just the standart sigmoid function
+    return 1 / (1 + math.exp(x))
 
 def assignRewards(datapoints: List[List[np.array]], reward: float) -> List[List[np.array]]:
     """
@@ -22,8 +25,11 @@ def assignRewards(datapoints: List[List[np.array]], reward: float) -> List[List[
     
     for i in range(n):
         datapoints[n - i - 1][-1] = reward
-        reward = -reward # The next state will be from the other players view (thus -reward)
-    
+        # The next state will be from the other players view (thus -reward)
+        # Also the nummerical value of the rewards should drop of 
+        reward = 1 - (sigmoid(-i // 2) / 2 - 0.2) if (i % 2) == 0 else -reward
+        if (i >= 10): reward = 0
+        # 0 if i > 8 else -np.sign(reward) * np.log(abs(reward))
     return datapoints
 
 def addMirrorImages (datapoints: List[List[np.array]]) -> List[List[np.array]]:
@@ -70,8 +76,7 @@ def executeEpisode (mcts: MCTS) -> List[List[np.array]]:
         if (reward != -1):
             # Assign rewards & add mirror images of the states
             return addMirrorImages(assignRewards(datapoints, reward))
-        
-
+    
 def stackDataset (dataset: List[List[np.array]]) -> (np.array):
     """ Simpely stacks the dataset """
     arrays = []

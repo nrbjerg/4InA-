@@ -69,6 +69,7 @@ def makeMove (state: np.array, idx: int) -> np.array:
     """
     currentMapIdx = 0 if (state[-1][0][0] == 1.0) else numberOfMapsPerPlayer
     state = state.copy()
+    
     # Play moves from the button up
     for i in range(1, height + 1):
         if (state[0][height - i][idx] == 0.0 and state[numberOfMapsPerPlayer][height - i][idx] == 0.0):
@@ -76,8 +77,7 @@ def makeMove (state: np.array, idx: int) -> np.array:
             state[currentMapIdx][height - i][idx] = 1.0
             break
     
-    flipPlayer(state) 
-       
+    flipPlayer(state)
     return state
 
 @njit()

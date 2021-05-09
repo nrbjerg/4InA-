@@ -1,18 +1,16 @@
-from math import floor
-
 # MCTS: 
 Cpuct = 1.0
 mctsGPU = True
 epsilon = 1e-8
 
 # Training:
-iterations = 10
-numberOfGames = 10
+iterations = 100
+numberOfGames = 100
 rooloutsDuringTraining = 32
-tau = 10 # After this many moves, the moves will be deterministic.
+tau = 12 # After this many moves, the moves will be deterministic.
 
 # Enable value head at this 
-enableValueHeadAfterIteration = iterations - (iterations // 2)
+enableValueHeadAfterIteration = 0 # iterations - (iterations // 2)
 
 # Training window
 def window (iteration: int) -> int:
@@ -23,7 +21,7 @@ def window (iteration: int) -> int:
 
 learningRate = 0.001 
 epochs = 10
-batchSize = 64
+batchSize = 128
 trainingOnGPU = True
 
 # Evaluation:
@@ -32,11 +30,11 @@ rooloutsDuringEvaluation = 16
 
 # Model:
 numberOfFilters = 256
-numberOfResidualBlocks = 16
-numberOfNeurons = 1024 # In the heads of the networks 
+numberOfResidualBlocks = 6
+numberOfNeurons = 512 # In the heads of the networks 
 numberOfHiddenLayers = 2
 performBatchNorm = True
-dropoutRate = 0.3
+dropoutRate = 0.2
 disableValueHead = False
 
 # Valuehead:

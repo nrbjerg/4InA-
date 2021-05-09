@@ -1,5 +1,5 @@
 from typing import Dict, List, Tuple
-from evaluate import evaluateModel, playGame
+from evaluate import playGame
 from utils import fileNumbersInDirectory, loadModel
 import numpy as np 
 import json 

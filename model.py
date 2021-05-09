@@ -136,10 +136,13 @@ class Net (nn.Module):
     
     def numberOfParameters (self) -> int:
         return sum([p.numel() for p in self.parameters()])
-        
+
 if (__name__ == '__main__'):
-    model = Net()
-    t = torch.randn(10, 2 * numberOfMapsPerPlayer + 1, 6, 7)
-    print(model(t))
-    print(model(t, training = True))
-    print(model.numberOfParameters())
+    model = Net().cuda()
+    from time import time 
+    
+    t1 = time()
+    for i in range(50):
+        t = torch.randn(20, 2 * numberOfMapsPerPlayer + 1, 6, 7).to("cuda")
+        t = model(t)
+    print(time() - t1)
