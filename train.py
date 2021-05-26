@@ -114,11 +114,12 @@ def train (model: Net, startingIteration: int):
         
         # Concatenate states, probs & rewards for training 
         data = [[] for _ in range(3)]
-        for d in datasets:
-            for idx, val in enumerate(d):
+        for datapoint in datasets:
+            for idx, val in enumerate(datapoint):
                 data[idx].extend(val)
                 
         data = [np.stack(d) for d in data]
+        print(len(data))
         info(f"There is currently {data[0].shape[0]} datapoints in training data, from a maximum of {window(iteration)} games")
         states, probs, rewards = convertTrainingDataToTensors(data)
         

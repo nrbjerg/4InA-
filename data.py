@@ -5,7 +5,7 @@ from state import flipGameState, makeMove, generateEmptyState, checkIfGameIsWon
 import numpy as np
 from numpy import random
 from typing import List
-from config import numberOfGames, rooloutsDuringTraining, width, height, trainingOnGPU, tau
+from config import numberOfGames, rooloutsDuringTraining, width, height, trainingOnGPU, tau, customReward, rewardDropOf
 from tqdm import tqdm
 import json 
 import math
@@ -26,10 +26,13 @@ def assignRewards(datapoints: List[List[np.array]], reward: float) -> List[List[
     for i in range(n):
         datapoints[n - i - 1][-1] = reward
         # The next state will be from the other players view (thus -reward)
-        # Also the nummerical value of the rewards should drop of 
-        reward = 1 - (sigmoid(-i // 2) / 2 - 0.2) if (i % 2) == 0 else -reward
-        if (i >= 10): reward = 0
-        # 0 if i > 8 else -np.sign(reward) * np.log(abs(reward))
+        # Also the numerical value of the rewards should drop of after each move
+        if customReward == True: 
+            reward = 1 - (sigmoid(-i // 2) / 2 - 0.2) if (i % 2) == 0 else -reward
+        else:
+            reward = -1.0
+        if (i >= rewardDropOf): break
+        
     return datapoints
 
 def addMirrorImages (datapoints: List[List[np.array]]) -> List[List[np.array]]:
@@ -75,7 +78,7 @@ def executeEpisode (mcts: MCTS) -> List[List[np.array]]:
         
         if (reward != -1):
             # Assign rewards & add mirror images of the states
-            return addMirrorImages(assignRewards(datapoints, reward))
+            return addMirrorImages(assignRewards(datapoints, float(reward)))
     
 def stackDataset (dataset: List[List[np.array]]) -> (np.array):
     """ Simpely stacks the dataset """
@@ -103,7 +106,6 @@ def createDataset (model: Net, iteration: int) -> (np.array):
         dataset += executeEpisode(mcts)
         mcts.reset() # Remove old states in mcts
         
-    # Shuffle for better training
     return stackDataset(dataset)
 
 def convertTrainingDataToTensors (dataset: List[np.array]) -> (torch.Tensor):
@@ -113,6 +115,7 @@ def convertTrainingDataToTensors (dataset: List[np.array]) -> (torch.Tensor):
         Returns:
             - The dataset converted to pytorch tensors moved to the gpu if needed, specifically (states, probabilities & rewards)
     """
+    dataset = [array.astype("float32") for array in dataset]
     tensors = [torch.from_numpy(array).float() for array in dataset]
     
     # Move arrays to gpu if needed

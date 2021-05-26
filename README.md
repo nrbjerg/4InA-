@@ -2,6 +2,8 @@
 An implementation of Alpha Zero, for connect 4. The project is implemented using pytorch aswell.
 
 ### Let me play!
+At the moment the training & evaluation code is being updated, to implement a better training algorithm, therefore this doesn't work at the moment
+
 To play the model simpely run `main.py` after installing the dependencies (pytorch, tqdm & numpy).
 
 

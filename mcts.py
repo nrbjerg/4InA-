@@ -16,7 +16,6 @@ class MCTS:
         if (mctsGPU == True): self.model.cuda()
         
         self.iteration = iteration
-        
         self.predictions = {} # Stores the predictions of the model
         
         # NOTE: Each state will be stored under the key: state.tobytes(), meaning that the byte string representing the numpy array will be used as a key
@@ -163,7 +162,7 @@ class MCTS:
         return -v
     
     def reset (self) -> None:
-        """ Resets the dictionaries (exluding the predictions dictionary) """
+        """ Resets the dictionaries (excluding the predictions dictionary) """
         self.Qsa = {}; self.Nsa = {}; self.Ns = {}; 
         self.Es = {}; self.Ps = {}; self.Vs = {}
     

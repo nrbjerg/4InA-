@@ -16,7 +16,7 @@ while (checkIfGameIsWon(state) == -1):
         except ValueError:
             move = int(input("Please specify a move index: "))
         while (valids[0][move] != 1):
-            move = int(input("Your input was invalid, please input new index: "))
+            move = int(input("Your input was invalid, please input new move: "))
         state = makeMove(state, move)
     else:
         state = makeMove(state, mcts.getMove(state, rooloutsDuringTraining))

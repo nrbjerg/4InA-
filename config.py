@@ -1,13 +1,17 @@
 # MCTS: 
-Cpuct = 1.0
+Cpuct = 0.5
 mctsGPU = True
 epsilon = 1e-8
 
 # Training:
 iterations = 100
-numberOfGames = 100
-rooloutsDuringTraining = 32
+numberOfGames = 40
+rooloutsDuringTraining = 48
+
+# Data collection
 tau = 12 # After this many moves, the moves will be deterministic.
+customReward = True # Use a custom reward function
+rewardDropOf = 10 # After assign rewards this many moves back
 
 # Enable value head at this 
 enableValueHeadAfterIteration = 0 # iterations - (iterations // 2)
