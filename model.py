@@ -138,11 +138,14 @@ class Net (nn.Module):
         return sum([p.numel() for p in self.parameters()])
 
 if (__name__ == '__main__'):
-    model = Net().cuda()
-    from time import time 
+    m = Net()
     
-    t1 = time()
-    for i in range(50):
-        t = torch.randn(20, 2 * numberOfMapsPerPlayer + 1, 6, 7).to("cuda")
-        t = model(t)
-    print(time() - t1)
+    print(m.forward(torch.zeros((108, 3, 6, 7)))[1].shape)
+    # model = Net().cuda()
+    # from time import time 
+    
+    # t1 = time()
+    # for i in range(50):
+        # t = torch.randn(20, 2 * numberOfMapsPerPlayer + 1, 6, 7).to("cuda")
+        # t = model(t)
+    # print(time() - t1)

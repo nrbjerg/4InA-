@@ -119,7 +119,6 @@ def train (model: Net, startingIteration: int):
                 data[idx].extend(val)
                 
         data = [np.stack(d) for d in data]
-        print(len(data))
         info(f"There is currently {data[0].shape[0]} datapoints in training data, from a maximum of {window(iteration)} games")
         states, probs, rewards = convertTrainingDataToTensors(data)
         

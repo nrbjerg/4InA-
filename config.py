@@ -5,7 +5,7 @@ epsilon = 1e-8
 
 # Training:
 iterations = 100
-numberOfGames = 40
+numberOfGames = 2
 rooloutsDuringTraining = 48
 
 # Data collection

@@ -24,14 +24,16 @@ def assignRewards(datapoints: List[List[np.array]], reward: float) -> List[List[
     n = len(datapoints)
     
     for i in range(n):
-        datapoints[n - i - 1][-1] = reward
-        # The next state will be from the other players view (thus -reward)
-        # Also the numerical value of the rewards should drop of after each move
-        if customReward == True: 
-            reward = 1 - (sigmoid(-i // 2) / 2 - 0.2) if (i % 2) == 0 else -reward
-        else:
-            reward = -1.0
-        if (i >= rewardDropOf): break
+        if (i >= rewardDropOf):
+            datapoints[n - i - 1][-1] = reward
+            # The next state will be from the other players view (thus -reward)
+            # Also the numerical value of the rewards should drop of after each move
+            if customReward == True: 
+                reward = 1 - (sigmoid(-i // 2) / 2 - 0.2) if (i % 2) == 0 else -reward
+            else:
+                reward = -1.0
+        else: 
+            datapoints[n - i - 1][-1] = 0
         
     return datapoints
 
@@ -115,6 +117,7 @@ def convertTrainingDataToTensors (dataset: List[np.array]) -> (torch.Tensor):
         Returns:
             - The dataset converted to pytorch tensors moved to the gpu if needed, specifically (states, probabilities & rewards)
     """
+    print([np.isnan(np.sum(d)) for d in dataset[:3]])
     dataset = [array.astype("float32") for array in dataset]
     tensors = [torch.from_numpy(array).float() for array in dataset]
     
@@ -128,7 +131,7 @@ def convertTrainingDataToTensors (dataset: List[np.array]) -> (torch.Tensor):
     states = tensors[0]
     probs = torch.reshape(tensors[1], (n, width))
     rewards = torch.reshape(tensors[2], (n, 1))
-        
+    
     return states, probs, rewards
 
 def saveDataset (dataset: List[List[np.array]]):
