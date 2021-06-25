@@ -1,7 +1,8 @@
 from mcts import MCTS
+from parallel import ParallelMCTS
 from model import Net, device
 import torch
-from state import flipGameState, makeMove, generateEmptyState, checkIfGameIsWon
+from state import flipGameState, getStringRepresentation, makeMove, generateEmptyState, checkIfGameIsWon
 import numpy as np
 from numpy import random
 from typing import List
@@ -9,6 +10,8 @@ from config import numberOfGames, rooloutsDuringTraining, width, height, trainin
 from tqdm import tqdm
 import json 
 import math
+from utils import loadLatetestModel, saveModel
+from predictor import predictor
 
 def sigmoid (x: float) -> float:
     # Just the standart sigmoid function
@@ -23,18 +26,19 @@ def assignRewards(datapoints: List[List[np.array]], reward: float) -> List[List[
     """
     n = len(datapoints)
     
-    for i in range(n):
-        if (i >= rewardDropOf):
-            datapoints[n - i - 1][-1] = reward
-            # The next state will be from the other players view (thus -reward)
-            # Also the numerical value of the rewards should drop of after each move
-            if customReward == True: 
-                reward = 1 - (sigmoid(-i // 2) / 2 - 0.2) if (i % 2) == 0 else -reward
-            else:
-                reward = -1.0
-        else: 
-            datapoints[n - i - 1][-1] = 0
-        
+    if (reward != 0.0):
+        for i in range(n):
+            if (i >= rewardDropOf):
+                datapoints[n - i - 1][-1] = reward
+                # The next state will be from the other players view (thus -reward)
+                # Also the numerical value of the rewards should drop of after each move
+                if customReward == True: 
+                    reward = 1 - (sigmoid(-i // 2) / 2 - 0.2) if (i % 2) == 0 else -reward
+                else:
+                    reward = -1.0
+            else: 
+                datapoints[n - i - 1][-1] = 0
+
     return datapoints
 
 def addMirrorImages (datapoints: List[List[np.array]]) -> List[List[np.array]]:
@@ -51,36 +55,6 @@ def addMirrorImages (datapoints: List[List[np.array]]) -> List[List[np.array]]:
         mirrors.append([flipGameState(d[0]), np.flip(d[1], axis = 1), d[2]])
 
     return datapoints + mirrors
-
-def executeEpisode (mcts: MCTS) -> List[List[np.array]]:
-    """ 
-        Args: 
-            - mcts: A montecarlo tree search algorithm
-        Returns:
-            - A list of datapoints, specifically: [[state, policy, reward]]
-    """
-    datapoints = []
-    state = generateEmptyState()
-    
-    for move in range (width * height):      
-        # Compute the probabilities & append the datapoint to the list.
-        probs = mcts.getActionProbs(state, rooloutsDuringTraining)
-        datapoints.append([state, probs, None]) 
-        probs = probs.flatten()
-        
-        # Chose move (if the number of moves is < tau, play deterministically)
-        if (move < tau):
-            move = random.choice(len(probs), p = probs)
-        else:
-            move = np.argmax(probs)
-        
-        # Make the new move, check for rewards
-        state = makeMove(state, move)
-        reward = checkIfGameIsWon(state)
-        
-        if (reward != -1):
-            # Assign rewards & add mirror images of the states
-            return addMirrorImages(assignRewards(datapoints, float(reward)))
     
 def stackDataset (dataset: List[List[np.array]]) -> (np.array):
     """ Simpely stacks the dataset """
@@ -90,7 +64,7 @@ def stackDataset (dataset: List[List[np.array]]) -> (np.array):
     
     return tuple([np.stack(array) for array in arrays])
 
-def createDataset (model: Net, iteration: int) -> (np.array):
+def createDataset (iteration: int) -> (np.array):
     """ 
         Args:
             - model: The neural network
@@ -99,16 +73,52 @@ def createDataset (model: Net, iteration: int) -> (np.array):
             - A dataset in the form of a tuple of numpy arrays specifically (states, policies, rewards)
     """
     print("Creating dataset:")
+    predictor.updateModel()
     # Initialize montecarlo tree search
-    mcts = MCTS(model, iteration = iteration)
+    mcts = ParallelMCTS(iteration = iteration)
     
     # Generate training data
-    dataset = []
-    for _ in tqdm(range(numberOfGames), unit = "game"):
-        dataset += executeEpisode(mcts)
-        mcts.reset() # Remove old states in mcts
+    states = [generateEmptyState() for _ in range(numberOfGames)]
+    datapoints = [[] for _ in range(numberOfGames)]
+    rewards = [-1 for _ in range(numberOfGames)]
+    numberOfMoves = 0
+    
+    while (any([True if r == -1 else False for r in rewards])):     
+        # Compute the probabilities & append the datapoint to the list.
+        s, indexes, n = [], [], 0
+        for idx, state in enumerate(states):
+            if (rewards[idx] == -1):
+                s.append(state)
+                indexes.append(idx)
+                n += 1
+                
+        probs = mcts.getActionProbs(s, rooloutsDuringTraining)
         
-    return stackDataset(dataset)
+        for idx, (state, p) in enumerate(zip(s, probs)):
+            datapoints[idx].append([state, p, None]) 
+            
+        moves = []
+        for idx, p in enumerate(probs):
+            p = p.flatten()
+            if (np.isnan(np.sum(p))):
+                print(getStringRepresentation(s[idx]))
+                
+            # Chose move (if the number of moves is < tau, play deterministically)
+            if (numberOfMoves < tau):
+                moves.append(random.choice(len(p), p = p))
+            else:
+                moves.append(np.argmax(p))
+        
+        for idx, move in enumerate(moves):
+            # Make the new move, check for rewards
+            states[indexes[idx]] = makeMove(states[indexes[idx]], move)
+            rewards[indexes[idx]] = checkIfGameIsWon(states[indexes[idx]])
+    
+    # Assign rewards and add mirror images
+    for idx in range(numberOfGames):
+        datapoints[idx] = addMirrorImages(assignRewards(datapoints[idx], rewards[idx]))
+      
+    return stackDataset(sum(datapoints, []))
 
 def convertTrainingDataToTensors (dataset: List[np.array]) -> (torch.Tensor):
     """ 
@@ -162,3 +172,19 @@ def loadDataset () -> List[List[np.array]]:
             return dataset
     except FileNotFoundError:
         return []
+    
+if (__name__ == "__main__"):
+
+    # model, iteration = loadLatetestModel()
+    # if (iteration == 0):
+        # saveModel(model, "0.pt")
+    
+    # Code for profiling: 
+    import sys 
+    # import cProfile
+    
+    sys.stdout = open("profile.txt", "w")
+
+    createDataset(0)
+    
+    # sys.stdout.close()
