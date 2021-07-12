@@ -78,6 +78,7 @@ class MCTS:
 
             # Move predictions back to cpu
             if (mctsGPU == True):
+
                 probs = probs.cpu()
                 value = value.cpu()
             

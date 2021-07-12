@@ -1,11 +1,14 @@
 # 4inA-
-An implementation of Alpha Zero, for connect 4. The project is implemented using pytorch aswell.
+An implementation of Alpha Zero, for connect 4. Using: NumPy, Numba & PyTorch.
 
 ### Let me play!
-At the moment the training & evaluation code is being updated, to implement a better training algorithm, therefore this doesn't work at the moment
 
-To play the model simpely run `main.py` after installing the dependencies (pytorch, tqdm & numpy).
+First make sure that you have the dependencies installed:
+* Numpy
+* Numba
+* PyTorch
 
+To play against the model simpely run `main.py` after installing the dependencies.
 
 ## Training & Evaluation:
 The models was trained over 200 iterations, one iteration is: 

@@ -7,7 +7,7 @@ def flipPlayer (state: np.array):
     """ Flips the values in the last index of the states tensor from 0 to 1 or from 1 to 0 """
     state[-1].fill(1 if state[-1][0][0] != 1 else 0)
 
-@njit
+@njit()
 def generateEmptyState () -> np.array:
     """ 
         Returns:
@@ -17,6 +17,7 @@ def generateEmptyState () -> np.array:
     state[-1].fill(1) # Indicate that it's the turn of player x
     return state
 
+@njit()
 def flipGameState (state: np.array) -> np.array:
     """ Flips the board around the y axis & returns a new view """
     return np.flip(state, axis = 2)

@@ -59,7 +59,7 @@ def updateWeights (model: Net, states: torch.Tensor, probs: torch.Tensor, reward
                 if (torch.sum(predictions[0] != predictions[0])): error("nan in policy")
                 elif (torch.sum(predictions[1] != predictions[1])): error("nan in value")
                 
-                policyLoss = crossEntropy(predictions[0], p) # TODO: Update this to another loss function
+                policyLoss = crossEntropy(predictions[0], p)
                 valueLoss = 0
                 if (disableValueHead == False):
                     valueLoss = mse(predictions[1], r)
@@ -90,7 +90,8 @@ def updateWeights (model: Net, states: torch.Tensor, probs: torch.Tensor, reward
                     info(f"Ended with losses: \n - value loss: {vLoss:.4f}\n - policy loss: {pLoss:.4f}")
                 else:
                     info(f"Ended with losses: \n - policy loss: {pLoss:.4f}")
-                    
+
+    # Move the model back to the cpu if needed.
     if (mctsGPU == False and trainingOnGPU == True):
         model.cpu()
 
@@ -98,7 +99,7 @@ def updateWeights (model: Net, states: torch.Tensor, probs: torch.Tensor, reward
 
 def train (model: Net, startingIteration: int):
     """ Trains the model using self play & evaluation """
-    datasets = loadDataset() # Load the dataset if it's present in the directory
+    datasets = loadDataset() # Load the dataset if it's present in the directory.
     
     for iteration in range(startingIteration, iterations + startingIteration):
         print(f"\nAt iteration {iteration + 1} / {iterations + startingIteration}")

@@ -1,6 +1,8 @@
-# MCTS: 
+import torch
+
+# MCTS:
 Cpuct = 0.5
-mctsGPU = True
+mctsGPU = True if (torch.cuda.is_available()) else False
 epsilon = 1e-8
 
 # Training:
@@ -26,7 +28,7 @@ def window (iteration: int) -> int:
 learningRate = 0.001 
 epochs = 10
 batchSize = 128
-trainingOnGPU = True
+trainingOnGPU = True if (torch.cuda.is_available()) else False
 
 # Evaluation:
 numberOfEvaluationGames = 49 # Per player (max 49.)
