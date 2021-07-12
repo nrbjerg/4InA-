@@ -131,6 +131,7 @@ def train (model: Net, startingIteration: int):
         if (percentage >= 50.0):
             print("Evaluation: New model won.")
             saveModel(model, f"{iteration + 1}.pt")
+            
         else:
             datasets.pop() # Remove the last entry from the dataset 
             model = loadLatetestModel()[0] # Load better model

@@ -88,6 +88,42 @@ def evaluateModel (model: Net, iteration: int, fast: bool = False, opponent: Net
           
     info(f"Winrate during evaluation : {winrate:.1f} %")
     return winrate
+
+def evaluateModel (model: Net, iteration: int, fast: bool = False, opponent: Net = None) -> float:
+    """ 
+        Creates two MCTS trees, one for the model passed as an argument, and one for
+        the model loaded by the loadLatestModel function. It then pits them against each other.
+        Returns:
+            - The models winrate against the model loaded by the loadLatestModel function.
+    """
+    print("Evaluating model:")
+    best = loadLatetestModel()[0]
+    
+    # Initialize search trees 
+    if (opponent == None):
+        bestMCTS = MCTS(best, iteration = iteration)
+    else:
+        bestMCTS = MCTS(opponent, iteration = iteration)
+        
+    modelMCTS = MCTS(model, iteration = iteration)
+    
+    # Play games against the old model
+    wins, losses = 0, 0
+    if (fast == False):
+        states = generateInitialStates()
+    else:
+        states = [makeMove(generateEmptyState(), idx) for idx in range(7)]
+        
+    for s in tqdm(random.sample(states, (numberOfEvaluationGames if (fast == False) else 7))):
+        # Actually play the games
+        wins, losses = playGame(s.copy(), modelMCTS, bestMCTS, wins, losses)
+        losses, wins = playGame(s.copy(), bestMCTS, modelMCTS, losses, wins)
+
+    # Compute the winrate
+    winrate = round((wins / (2 * (numberOfEvaluationGames if (fast == False) else 7))) * 100, 1)
+          
+    info(f"Winrate during evaluation : {winrate:.1f} %")
+    return winrate
       
 if (__name__ == "__main__"):
     print(evaluateModel(loadModel("0.pt"), 0, fast = False))
