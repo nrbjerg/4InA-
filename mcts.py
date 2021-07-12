@@ -33,7 +33,7 @@ class MCTS:
             Args:
                 - State: The state of the game
                 - Roolouts: the number of roolouts during search
-                - Temperature: Determines how deterministicly the moves are chosen.
+                - Temperature: Determines how deterministically the moves are chosen.
             Returns:
                 - A 2d matrix in the dimensions (1, width) containing the probabilities of picking each move.
         """
@@ -133,12 +133,11 @@ class MCTS:
         for a in range(width):
             if (self.Vs[s][0][a] == 1):
                 prior = self.Ps[s][0][a]
-                if (s, a) in self.Qsa:
+                if (s, a) in self.Qsa: # if its in Qsa its in Nsa as well.
                     # Compute the UCB score
                     u = self.Qsa[(s, a)] + Cpuct * prior * np.sqrt(self.Ns[s]) /  (1 + self.Nsa[(s, a)])
                 
-                else:
-                    # When Qsa = 0
+                else: # When Qsa = 0
                     u = Cpuct * prior * np.sqrt(self.Ns[s] + epsilon)
                 
                 if (u > best["score"]):
