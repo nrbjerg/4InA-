@@ -106,7 +106,7 @@ def train (model: Net, startingIteration: int):
         info(f"At iteration {iteration + 1}:")
         
         # Create new dataset and append it to datasets
-        states, probs, rewards = createDataset(model, iteration - startingIteration)
+        states, probs, rewards = createDataset(iteration - startingIteration)
         datasets.append([states, probs, rewards])
         
         # Remove old datapoints

@@ -34,7 +34,7 @@ class ParallelMCTS:
                 - Roolouts: the number of roolouts during search
                 - Temperature: Determines how deterministically the moves are chosen.
             Returns:
-                - A 3d matrix in the dimensions (numberOfStates, 1, width) 
+                - A 3d Tensor in the dimensions (numberOfStates, 1, width)
                   containing the probabilities of picking each move in each state.
         """
         numberOfStates = len(states)
@@ -58,7 +58,7 @@ class ParallelMCTS:
             else:
                 # Else compute a probability distribution on the moves based on the number of visits to each move
                 probs[idx] = np.power(counts[idx], 1.0 / temperature) / np.sum(counts[idx])
-                
+
         return probs
             
     def getMove (self, states: List[np.array], roolouts: int) -> List[int]:

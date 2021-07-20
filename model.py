@@ -84,19 +84,19 @@ class PolicyHead (nn.Module):
     
         self.hiddenLayers = nn.ModuleList(hiddenLayers)
         
-    def forward (self, x: Tensor, training: bool = False) -> Tensor:
+    def forward(self, x: Tensor, training: bool = False) -> Tensor:
         """ Pass data through the policy head of the network """
         x = F.relu(self.bn1(self.conv1(x)))
         x = self.dropoutLayers[0](torch.flatten(x, start_dim = 1))
-        
+
         # Pass data through the hidden layers.
         for do, h in zip(self.dropoutLayers[1:], self.hiddenLayers[:-1]):
             x = do(F.relu(h(x)))
 
-        if (training == True):
+        if training:
             # If training is true return the logits
             return self.hiddenLayers[-1](x)
-        
+
         else:
             # If training is false return the policy vector
             return torch.exp(torch.log_softmax(self.hiddenLayers[-1](x), dim = 1))

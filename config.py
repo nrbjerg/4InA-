@@ -8,12 +8,12 @@ epsilon = 1e-8
 # Training:
 iterations = 100
 numberOfGames = 100
-rooloutsDuringTraining = 48
+rooloutsDuringTraining = 32
 
 # Data collection
 tau = 12 # After this many moves, the moves will be deterministic.
 customReward = True # Use a custom reward function
-rewardDropOf = 10 # After assign rewards this many moves back
+rewardDropOf = 10 # Assign rewards to this many positions (ie. if the game was won on move 32, assign rewards to state 22 - 32 (if rewardDropOf is set to 10))
 
 # Enable value head at this 
 enableValueHeadAfterIteration = 0 # iterations - (iterations // 2)
@@ -31,20 +31,20 @@ batchSize = 128
 trainingOnGPU = True if (torch.cuda.is_available()) else False
 
 # Evaluation:
-numberOfEvaluationGames = 49 # Per player (max 49.)
+numberOfEvaluationGames = 49 # Per player (7 or 49)
 rooloutsDuringEvaluation = 16
 
 # Model:
-numberOfFilters = 256
-numberOfResidualBlocks = 6
-numberOfNeurons = 512 # In the heads of the networks 
+numberOfFilters = 96
+numberOfResidualBlocks = 8
+numberOfNeurons = 128 # In the heads of the networks
 numberOfHiddenLayers = 2
 performBatchNorm = True
-dropoutRate = 0.2
+dropoutRate = 0.3
 disableValueHead = False
 
 # Valuehead:
-valueHeadFilters = 8
+valueHeadFilters = 16
 
 # Policyhead:
 policyHeadFilters = 32

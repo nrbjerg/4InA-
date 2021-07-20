@@ -17,7 +17,6 @@ def generateEmptyState () -> np.array:
     state[-1].fill(1) # Indicate that it's the turn of player x
     return state
 
-@njit()
 def flipGameState (state: np.array) -> np.array:
     """ Flips the board around the y axis & returns a new view """
     return np.flip(state, axis = 2)

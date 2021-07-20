@@ -6,7 +6,8 @@ import torch
 from utils import loadLatetestModel
 
 class Predictor:
-    
+    """ Is used as a predictor (an interface between the MCTS & the models) """
+
     def __init__ (self, model: Net):
         self.model = model
         self.model.eval()
