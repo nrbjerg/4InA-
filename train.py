@@ -10,7 +10,7 @@ from config import learningRate, disableValueHead, batchSize, epochs, iterations
 import numpy as np
 from tqdm import trange
 from logger import info, error
-from data import createDataset, convertTrainingDataToTensors, saveDataset, loadDataset
+from data import createDatasetWithNormalMCTS, convertTrainingDataToTensors, saveDataset, loadDataset
 
 mse = nn.MSELoss()
 
@@ -106,7 +106,7 @@ def train (model: Net, startingIteration: int):
         info(f"At iteration {iteration + 1}:")
         
         # Create new dataset and append it to datasets
-        states, probs, rewards = createDataset(iteration - startingIteration)
+        states, probs, rewards = createDatasetWithNormalMCTS(model, iteration - startingIteration)
         datasets.append([states, probs, rewards])
         
         # Remove old datapoints

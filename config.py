@@ -25,8 +25,8 @@ def window (iteration: int) -> int:
     else:
         return int(round(iteration ** (1.0 / 3)))
 
-learningRate = 0.001
-epochs = 10
+learningRate = 0.0001
+epochs = 100
 batchSize = 128
 trainingOnGPU = bool(torch.cuda.is_available())
 
@@ -35,8 +35,8 @@ numberOfEvaluationGames = 49 # Per player (7 or 49)
 rooloutsDuringEvaluation = 16
 
 # Model:
-numberOfFilters = 96
-numberOfResidualBlocks = 8
+numberOfFilters = 48
+numberOfResidualBlocks = 3
 numberOfNeurons = 128 # In the heads of the networks
 numberOfHiddenLayers = 2
 performBatchNorm = True
@@ -44,10 +44,10 @@ dropoutRate = 0.3
 disableValueHead = False
 
 # Valuehead:
-valueHeadFilters = 16
+valueHeadFilters = 9
 
 # Policyhead:
-policyHeadFilters = 32
+policyHeadFilters = 16
 
 # State: 
 height, width = 6, 7

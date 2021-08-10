@@ -56,7 +56,6 @@ def addMirrorImages(datapoints: List[List[np.array]]) -> List[List[np.array]]:
         [flipGameState(d[0]), np.flip(d[1], axis=1), d[2]] for d in datapoints
     ]
 
-
     return datapoints + mirrors
     
 def stackDataset(dataset: List[List[np.array]]) -> np.array:
@@ -64,10 +63,54 @@ def stackDataset(dataset: List[List[np.array]]) -> np.array:
     arrays = [[item[idx] for item in dataset] for idx in range(3)] # Create a list with nested lists of gamestates, probs, rewards
     return tuple(np.stack(array) for array in arrays) # Stack the lists together
 
-def createDataset(iteration: int) -> Tuple[np.array]:
+def executeEpisode(mcts: MCTS) -> List[List[np.array]]:
+    """ 
+        Args: 
+            - mcts: A montecarlo tree search algorithm
+        Returns:
+            - A list of datapoints, specifically: [[state, policy, reward]]
+    """
+    datapoints = []
+    state = generateEmptyState()
+
+    for numberOfMoves in range (width * height):  
+        # Compute the probabilities & append the datapoint to the list.
+        probs = mcts.getActionProbs(state, rooloutsDuringTraining)
+        datapoints.append([state, probs, 0.0]) # NOTE: The reward changed if reward != 0.0 (in the assign reward function)
+        probs = probs.flatten()
+
+        # Chose move (if the number of moves is < tau, play deterministically)
+        move = (
+            random.choice(len(probs), p=probs)
+            if (numberOfMoves < tau)
+            else np.argmax(probs)
+        )
+
+        # Make the new move, check for rewards
+        state = makeMove(state, move)
+        reward = checkIfGameIsWon(state)
+
+        if (reward != -1):
+            # Assign rewards & add mirror images of the states
+            return addMirrorImages(assignRewards(datapoints, float(reward)))
+
+def createDatasetWithNormalMCTS (model: Net, iteration: int) -> Tuple[np.array]:
     """ 
         Args:
-            - model: The neural network
+            - iteration: The current iteration (used for enabled / disabeling value head in mcts)
+        Returns:
+            - A dataset in the form of a tuple of numpy arrays specifically (states, policies, rewards)
+    """
+    mcts = MCTS(model = model, iteration = iteration)
+    dataset = []
+    for _ in tqdm(range(numberOfGames), unit = "game"):
+        dataset += executeEpisode(mcts)
+        mcts.reset() # Remove old states in mcts
+    return stackDataset(dataset)
+
+def createDatasetWithParrallelMCTS (iteration: int) -> Tuple[np.array]:
+    """ 
+        Args:
             - iteration: The current iteration (used for enabled / disabeling value head in mcts)
         Returns:
             - A dataset in the form of a tuple of numpy arrays specifically (states, policies, rewards)
@@ -123,7 +166,7 @@ def createDataset(iteration: int) -> Tuple[np.array]:
     print(f"Created a dataset of {numberOfGames} games ({len(datapoints)} individual datapoints)")
     return stackDataset(sum(datapoints, []))
 
-def convertTrainingDataToTensors (dataset: List[np.array]) -> (torch.Tensor):
+def convertTrainingDataToTensors (dataset: List[np.array], checkForNan: bool = False) -> (torch.Tensor):
     """ 
         Args: 
             - Dataset as a list of numpy arrays, specifically [states, policies, rewards]
@@ -131,8 +174,9 @@ def convertTrainingDataToTensors (dataset: List[np.array]) -> (torch.Tensor):
             - The dataset converted to pytorch tensors moved to the gpu if needed, specifically (states, probabilities & rewards)
     """
     # Check wether or not the dataset contains nan
-    
-    info(str([np.isnan(np.sum(d)) for d in dataset[:3]]))
+    if checkForNan: 
+        info(str([np.isnan(np.sum(d)) for d in dataset[:3]]))
+
     dataset = [array.astype("float32") for array in dataset]
     tensors = [torch.from_numpy(array).float() for array in dataset]
     
