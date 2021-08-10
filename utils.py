@@ -16,12 +16,10 @@ def resetDirectory (folder: str) -> None:
         except Exception as e:
             print('Failed to delete %s. Reason: %s' % (file_path, e))
 
-def fileNumbersInDirectory (folder: str) -> List[str]:
+def fileNumbersInDirectory(folder: str) -> List[str]:
     """ Returns a list of files in the folder """
     files = os.listdir(folder)
-    numbers = [] 
-    for f in files:
-        numbers.append((f.split(".")[0]))
+    numbers = [f.split(".")[0] for f in files]
     return sorted(numbers)
 
 def saveModel (model, filename: str):
@@ -36,7 +34,7 @@ def loadModel(filename: str):
     """ Loads a model from the models directory """
     return torch.load(os.path.join(os.getcwd(), "models", filename))
 
-def loadLatetestModel () -> Tuple[Net, int]:
+def loadLatestModel () -> Tuple[Net, int]:
     """ Loads the latest model from the models directory (if no model is present, a new model is initialized) """
     files = os.listdir(os.path.join(os.getcwd(), "models"))
     try:

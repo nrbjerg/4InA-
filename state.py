@@ -5,7 +5,7 @@ from config import width, height, numberOfMapsPerPlayer
 @njit()
 def flipPlayer (state: np.array):
     """ Flips the values in the last index of the states tensor from 0 to 1 or from 1 to 0 """
-    state[-1].fill(1 if state[-1][0][0] != 1 else 0)
+    state[-1].fill(1 if state[-1][0][0] != 1 else -1) # TODO: Check if this should be -1
 
 @njit()
 def generateEmptyState () -> np.array:
@@ -22,7 +22,7 @@ def flipGameState (state: np.array) -> np.array:
     return np.flip(state, axis = 2)
     
 @njit()
-def checkIfGameIsWon (state: np.array) -> int:
+def checkIfGameIsWon(state: np.array) -> int:
     """ 
         Checks if the last player won the game, given the current state of the game
         Returns:
@@ -30,31 +30,35 @@ def checkIfGameIsWon (state: np.array) -> int:
             0  if the game was a draw.
             -1 if the game hasn't ended
     """
-    playerIdx = 0 if (state[-1][0][0] == 0.0) else numberOfMapsPerPlayer
+    playerIdx = 0 if (state[-1][0][0] == -1) else numberOfMapsPerPlayer
 
     s = state[playerIdx]
-        
+
     # 1. Check for horizontal alignments
     for i in prange(height):
         for j in range(width - 3):
             if (s[i, j] == 1.0 and s[i, j + 1] == 1.0 and s[i, j + 2] == 1.0 and s[i, j + 3] == 1.0): return 1
-                
+
     # 2. Check for vertical alignments
     for i in range(height - 3):
         for j in range(width):
             if (s[i, j] == 1.0 and s[i + 1, j] == 1.0 and s[i + 2, j] == 1.0 and s[i + 3, j] == 1.0): return 1
-     
+
     # 3. Check for diagonal alignments
     for i in range(height - 3):    
         for j in range(width - 3):
             if (s[i, j] + s[i + 1, j + 1] + s[i + 2, j + 2] + s[i + 3, j + 3] == 4.0): return 1
             if (s[i, j + 3] + s[i + 1, j + 2] + s[i + 2, j + 1] + s[i + 3, j] == 4.0): return 1
-    
+
     # 4. Check for empty moves
     mask = state[0] + state[numberOfMapsPerPlayer]
     for i in range(width):
         if (mask[0][i] == 0.0): return -1
-    
+
+    # NOTE: Numba doesn't support this kind of program otherwise this would be cleaner (but slower)
+    # if all(mask[0][i] != 0.0 for i in range(width)):
+    #     return -1
+
     # 5. The game is a draw if there is no empty moves
     return 0
     
@@ -81,12 +85,12 @@ def makeMove (state: np.array, idx: int) -> np.array:
     return state
 
 @njit()
-def validMoves(state: np.array) -> np.array:
+def validMoves(state: np.array) -> np.array: # NOTE: These moves are only sudo legal ;)
     """ 
         Args: 
             - State: the numpy array currently representing the game
         Returns:
-            - A matrix in the dimensions (1, width), with each element set to 0 
+            - A row vector with each element set to 0 
               if the appropriate move is not valid and 1 otherwise.
     """
     result = np.zeros((1, width), dtype = np.float32) 
@@ -94,7 +98,7 @@ def validMoves(state: np.array) -> np.array:
         if (state[0][0][i] == 0.0 and state[numberOfMapsPerPlayer][0][i] == 0.0): result[0][i] = 1.0
     return result
 
-def getStringRepresentation (state: np.array) -> str:
+def getStringRepresentation(state: np.array) -> str:
     """ Returns a string representation of the current state """
     x, o = state[0], state[numberOfMapsPerPlayer]
     lines = []
@@ -107,7 +111,7 @@ def getStringRepresentation (state: np.array) -> str:
                 lines[-1] += "o|"
             else:
                 lines[-1] += " |"
-    return "".join(lines) + "\n" + "".join([" " + str(i) for i in range(width)]) + ""
+    return "".join(lines) + "\n" + "".join(" " + str(i) for i in range(width)) + "\n"
 
 if (__name__ == "__main__"):
     s = generateEmptyState()

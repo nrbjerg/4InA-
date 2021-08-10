@@ -3,7 +3,7 @@ from config import mctsGPU, numberOfMapsPerPlayer, height, width
 from typing import List, Tuple
 import numpy as np
 import torch
-from utils import loadLatetestModel
+from utils import loadLatestModel
 
 class Predictor:
     """ Is used as a predictor (an interface between the MCTS & the models) """
@@ -16,12 +16,12 @@ class Predictor:
         
     def updateModel (self): 
         """ Load the latest model """
-        self.model, _ = loadLatetestModel()
+        self.model, _ = loadLatestModel()
         self.model.eval()
         
         if (mctsGPU == True): self.model.cuda()
         
-    def predict (self, states: List[np.array], numberOfStates: int) -> Tuple[np.array]:
+    def predict (self, states: np.array, numberOfStates: int) -> Tuple[np.array]:
         """ 
             Args:
                 - states: The states which should be passed through the network 
@@ -36,11 +36,13 @@ class Predictor:
                 stateTensor = stateTensor.to(device)
     
             probs, values = self.model(stateTensor)
+
             # Move predictions back to cpu
             if (mctsGPU == True):
-                probs = probs.cpu().numpy()
-                values = values.cpu().numpy()
-            
+                probs = probs.cpu()
+                values = values.cpu()
+           
+            probs = probs.numpy() 
+            values = values.numpy()
             return (probs, values)
              
-predictor = Predictor(loadLatetestModel()[0])

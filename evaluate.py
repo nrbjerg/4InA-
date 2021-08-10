@@ -2,7 +2,7 @@ from typing import List, Tuple
 from model import Net
 from state import *
 from mcts import MCTS
-from utils import loadLatetestModel, loadModel
+from utils import loadLatestModel, loadModel
 import numpy as np
 from config import width
 from tqdm import tqdm
@@ -53,7 +53,11 @@ def playGame (state: np.array, m1: MCTS, m2: MCTS, w: int, l: int) -> Tuple[int]
         # M2 played the last move
         return (w, l + reward)
 
-def evaluateModel (model: Net, iteration: int, fast: bool = False, opponent: Net = None) -> float:
+def computeWinrate (wins: int, numberOfGames: int) -> float:
+    """ Computes the winrate of a player based on the number of wins and the number of games """
+    return round(wins / (2 * numberOfGames) * 100, 1)
+
+def evaluateModel(model: Net, iteration: int, fast: bool = False, opponent: Net = None) -> float:
     """ 
         Creates two MCTS trees, one for the model passed as an argument, and one for
         the model loaded by the loadLatestModel function. It then pits them against each other.
@@ -61,67 +65,31 @@ def evaluateModel (model: Net, iteration: int, fast: bool = False, opponent: Net
             - The models winrate against the model loaded by the loadLatestModel function.
     """
     print("Evaluating model:")
-    best = loadLatetestModel()[0]
-    
-    # Initialize search trees 
-    if (opponent == None):
-        bestMCTS = MCTS(best, iteration = iteration)
+    best = loadLatestModel()[0]
+
+    # Initialize search trees
+    if opponent is None:
+        bestMCTS = MCTS(model = best, iteration = iteration)
     else:
-        bestMCTS = MCTS(opponent, iteration = iteration)
-        
-    modelMCTS = MCTS(model, iteration = iteration)
-    
+        bestMCTS = MCTS(model = opponent, iteration = iteration)
+
+    modelMCTS = MCTS(model = model, iteration = iteration)
+
     # Play games against the old model
     wins, losses = 0, 0
-    if (fast == False):
+    if not fast:
         states = generateInitialStates()
     else:
         states = [makeMove(generateEmptyState(), idx) for idx in range(7)]
-        
+
     for s in tqdm(random.sample(states, (numberOfEvaluationGames if (fast == False) else 7))):
         # Actually play the games
         wins, losses = playGame(s.copy(), modelMCTS, bestMCTS, wins, losses)
         losses, wins = playGame(s.copy(), bestMCTS, modelMCTS, losses, wins)
 
     # Compute the winrate
-    winrate = round((wins / (2 * (numberOfEvaluationGames if (fast == False) else 7))) * 100, 1)
-          
-    info(f"Winrate during evaluation : {winrate:.1f} %")
-    return winrate
+    winrate = computeWinrate(wins, numberOfEvaluationGames if not fast else 7) 
 
-def evaluateModel (model: Net, iteration: int, fast: bool = False, opponent: Net = None) -> float:
-    """ 
-        Creates two MCTS trees, one for the model passed as an argument, and one for
-        the model loaded by the loadLatestModel function. It then pits them against each other.
-        Returns:
-            - The models winrate against the model loaded by the loadLatestModel function.
-    """
-    print("Evaluating model:")
-    best = loadLatetestModel()[0]
-    
-    # Initialize search trees 
-    if (opponent == None):
-        bestMCTS = MCTS(best, iteration = iteration)
-    else:
-        bestMCTS = MCTS(opponent, iteration = iteration)
-        
-    modelMCTS = MCTS(model, iteration = iteration)
-    
-    # Play games against the old model
-    wins, losses = 0, 0
-    if (fast == False):
-        states = generateInitialStates()
-    else:
-        states = [makeMove(generateEmptyState(), idx) for idx in range(7)]
-        
-    for s in tqdm(random.sample(states, (numberOfEvaluationGames if (fast == False) else 7))):
-        # Actually play the games
-        wins, losses = playGame(s.copy(), modelMCTS, bestMCTS, wins, losses)
-        losses, wins = playGame(s.copy(), bestMCTS, modelMCTS, losses, wins)
-
-    # Compute the winrate
-    winrate = round((wins / (2 * (numberOfEvaluationGames if (fast == False) else 7))) * 100, 1)
-          
     info(f"Winrate during evaluation : {winrate:.1f} %")
     return winrate
       

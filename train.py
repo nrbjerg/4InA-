@@ -1,5 +1,5 @@
 from torch.types import Number
-from utils import loadLatetestModel, saveModel
+from utils import loadLatestModel, saveModel
 from evaluate import evaluateModel
 import torch
 from torch import nn, Tensor
@@ -134,7 +134,7 @@ def train (model: Net, startingIteration: int):
             
         else:
             datasets.pop() # Remove the last entry from the dataset 
-            model = loadLatetestModel()[0] # Load better model
+            model = loadLatestModel()[0] # Load better model
             
         info("\n")
     
@@ -143,7 +143,7 @@ def train (model: Net, startingIteration: int):
 
 if __name__ == '__main__':
     
-    model, iteration = loadLatetestModel()
+    model, iteration = loadLatestModel()
     if (iteration == 0):
         saveModel(model, "0.pt")
     

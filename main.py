@@ -1,11 +1,11 @@
 from state import *
 from mcts import MCTS
-from utils import loadLatetestModel
+from utils import loadLatestModel
 from model import Net
 from config import rooloutsDuringTraining
 
 state = generateEmptyState()
-mcts = MCTS(loadLatetestModel()[0])
+mcts = MCTS(loadLatestModel()[0])
 
 while (checkIfGameIsWon(state) == -1):
     print(getStringRepresentation(state), "\n")

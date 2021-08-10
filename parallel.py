@@ -6,24 +6,24 @@ from state import checkIfGameIsWon, generateEmptyState, getStringRepresentation,
 from config import Cpuct, enableValueHeadAfterIteration, rooloutsDuringTraining, width, height, mctsGPU, numberOfMapsPerPlayer, epsilon, disableValueHead
 import torch
 from logger import *
-from utils import loadLatetestModel
-from predictor import predictor
+from utils import loadLatestModel
+from predictor import Predictor
 
 class ParallelMCTS:
 
-    def __init__ (self, iteration: int = 0):
+    def __init__(self, iteration: int = 0, model: Net = None):
         """ Stores the data used for Monte-Carlo tree search """
-        
+        self.predictor = Predictor(model or loadLatestModel()[0])
         self.iteration = iteration
         self.predictions = {} # Stores the predictions of the model
-        
+
         # NOTE: Each state will be stored under the key: state.tobytes(), meaning that the byte string representing the numpy array will be used as a key
         self.Qsa = {} # The Q values for s,a
         self.Nsa = {} # The number of times the action a has been taken from state s
         self.Ns = {} # The number of times the state has been visited
-        
+
         self.Ps = {} # Stores the initial policy (from the neural network)
-        
+
         self.Es = {} # Stores if the current state has terminated (1 for win, 0 for draw, -1 for not terminated)
         self.Vs = {} # Stores the valid moves for the state s
     
@@ -100,7 +100,7 @@ class ParallelMCTS:
         # Perform the predictions
         n = len(statesForPredictions)
         if (n != 0):
-            predictions = predictor.predict(np.stack(statesForPredictions), n)
+            predictions = self.predictor.predict(np.stack(statesForPredictions), n)
             for i in range(n):
                 self.predictions[statesForPredictions[i].tobytes()] = (predictions[0][i], predictions[1][i][0])
         

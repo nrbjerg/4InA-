@@ -5,13 +5,16 @@ import torch
 from state import flipGameState, getStringRepresentation, makeMove, generateEmptyState, checkIfGameIsWon
 import numpy as np
 from numpy import random
-from typing import List
+from typing import List, Tuple
 from config import numberOfGames, rooloutsDuringTraining, width, height, trainingOnGPU, tau, customReward, rewardDropOf
 from tqdm import tqdm
 import json 
 import math
-from utils import loadLatetestModel, saveModel
-from predictor import predictor
+from utils import loadLatestModel, saveModel
+from predictor import Predictor
+from logger import info
+
+predictor = Predictor(loadLatestModel()[0])
 
 def sigmoid (x: float) -> float:
     # Just the standart sigmoid function
@@ -24,9 +27,9 @@ def assignRewards(datapoints: List[List[np.array]], reward: float) -> List[List[
         Returns:
             - The list: [[state, policy, reward]] where reward is set to either (reward or -reward).
     """
-    n = len(datapoints)
-    
     if (reward != 0.0):
+        n = len(datapoints)
+
         for i in range(n):
             if (i >= rewardDropOf):
                 datapoints[n - i - 1][-1] = reward
@@ -41,7 +44,7 @@ def assignRewards(datapoints: List[List[np.array]], reward: float) -> List[List[
 
     return datapoints
 
-def addMirrorImages (datapoints: List[List[np.array]]) -> List[List[np.array]]:
+def addMirrorImages(datapoints: List[List[np.array]]) -> List[List[np.array]]:
     """ 
         Args: 
             - datapoints: A list of datapoints, in the form [[state, policy, reward]].
@@ -49,22 +52,19 @@ def addMirrorImages (datapoints: List[List[np.array]]) -> List[List[np.array]]:
             - The list of datapoints with extra mirror images, specifically: 
             [[mirror(state), mirror(policy), reward]] + [[state, policy, reward]].
     """
-    mirrors = []
-    
-    for d in datapoints:
-        mirrors.append([flipGameState(d[0]), np.flip(d[1], axis = 1), d[2]])
+    mirrors = [
+        [flipGameState(d[0]), np.flip(d[1], axis=1), d[2]] for d in datapoints
+    ]
+
 
     return datapoints + mirrors
     
-def stackDataset (dataset: List[List[np.array]]) -> (np.array):
+def stackDataset(dataset: List[List[np.array]]) -> np.array:
     """ Simpely stacks the dataset """
-    arrays = []
-    for idx in range(len(dataset[0])):
-        arrays.append([item[idx] for item in dataset])
-    
-    return tuple([np.stack(array) for array in arrays])
+    arrays = [[item[idx] for item in dataset] for idx in range(3)] # Create a list with nested lists of gamestates, probs, rewards
+    return tuple(np.stack(array) for array in arrays) # Stack the lists together
 
-def createDataset (iteration: int) -> (np.array):
+def createDataset(iteration: int) -> Tuple[np.array]:
     """ 
         Args:
             - model: The neural network
@@ -72,18 +72,19 @@ def createDataset (iteration: int) -> (np.array):
         Returns:
             - A dataset in the form of a tuple of numpy arrays specifically (states, policies, rewards)
     """
+    # TODO: There is some major problems with this code
     print("Creating dataset:")
     predictor.updateModel()
     # Initialize montecarlo tree search
     mcts = ParallelMCTS(iteration = iteration)
-    
+
     # Generate training data
     states = [generateEmptyState() for _ in range(numberOfGames)]
     datapoints = [[] for _ in range(numberOfGames)]
     rewards = [-1 for _ in range(numberOfGames)]
     numberOfMoves = 0
-    
-    while (any([True if r == -1 else False for r in rewards])):     
+
+    while -1 in rewards:     
         # Compute the probabilities & append the datapoint to the list.
         s, indexes, n = [], [], 0
         for idx, state in enumerate(states):
@@ -91,33 +92,35 @@ def createDataset (iteration: int) -> (np.array):
                 s.append(state)
                 indexes.append(idx)
                 n += 1
-                
+
         probs = mcts.getActionProbs(s, rooloutsDuringTraining)
-        
+
         for idx, (state, p) in enumerate(zip(s, probs)):
             datapoints[idx].append([state, p, None]) 
-            
+
         moves = []
         for idx, p in enumerate(probs):
             p = p.flatten()
             if (np.isnan(np.sum(p))):
+                # For debuging purposes
                 print(getStringRepresentation(s[idx]))
-                
+
             # Chose move (if the number of moves is < tau, play deterministically)
             if (numberOfMoves < tau):
                 moves.append(random.choice(len(p), p = p))
             else:
                 moves.append(np.argmax(p))
-        
+
         for idx, move in enumerate(moves):
             # Make the new move, check for rewards
             states[indexes[idx]] = makeMove(states[indexes[idx]], move)
             rewards[indexes[idx]] = checkIfGameIsWon(states[indexes[idx]])
-    
+
     # Assign rewards and add mirror images
     for idx in range(numberOfGames):
         datapoints[idx] = addMirrorImages(assignRewards(datapoints[idx], rewards[idx]))
-      
+
+    print(f"Created a dataset of {numberOfGames} games ({len(datapoints)} individual datapoints)")
     return stackDataset(sum(datapoints, []))
 
 def convertTrainingDataToTensors (dataset: List[np.array]) -> (torch.Tensor):
@@ -127,7 +130,9 @@ def convertTrainingDataToTensors (dataset: List[np.array]) -> (torch.Tensor):
         Returns:
             - The dataset converted to pytorch tensors moved to the gpu if needed, specifically (states, probabilities & rewards)
     """
-    print([np.isnan(np.sum(d)) for d in dataset[:3]])
+    # Check wether or not the dataset contains nan
+    
+    info(str([np.isnan(np.sum(d)) for d in dataset[:3]]))
     dataset = [array.astype("float32") for array in dataset]
     tensors = [torch.from_numpy(array).float() for array in dataset]
     
@@ -144,47 +149,30 @@ def convertTrainingDataToTensors (dataset: List[np.array]) -> (torch.Tensor):
     
     return states, probs, rewards
 
-def saveDataset (dataset: List[List[np.array]]):
+def saveDataset(dataset: List[List[np.array]]):
     """ Saves the dataset to the datasets directory. """
-    jsonObject = {}
-    for idx, d in enumerate(dataset):
-        jsonObject[str(idx)] = {"s": d[0].tolist(),
-                                "p": d[1].tolist(),
-                                "r": d[2].tolist()}
-    
+    jsonObject = {
+        str(idx): {"s": d[0].tolist(), "p": d[1].tolist(), "r": d[2].tolist()}
+        for idx, d in enumerate(dataset)
+    }
+
     # Save the data to the data.json file
     with open("data/data.json", "w") as jsonFile:
         json.dump(jsonObject, jsonFile)
         
-def loadDataset () -> List[List[np.array]]:
+def loadDataset() -> List[List[np.array]]:
     """ Loads the dataset from the datasets directory. """
     # Open json file and load it's contents
     try:
         with open("data/data.json", "r") as jsonFile:
             data = json.load(jsonFile)
-            
-            dataset = []
-            for key in data.keys():
-                dataset.append([np.array(data[key]["s"], dtype = "float32"), 
-                                np.array(data[key]["p"], dtype = "float32"), 
-                                np.array(data[key]["r"], dtype = "float32")])
-                
-            return dataset
+
+            return [
+                       [np.array(data[key]["s"], dtype="float32"),
+                        np.array(data[key]["p"], dtype="float32"),
+                        np.array(data[key]["r"], dtype="float32")]
+                    for key in data.keys()]
+
     except FileNotFoundError:
         return []
     
-if (__name__ == "__main__"):
-
-    # model, iteration = loadLatetestModel()
-    # if (iteration == 0):
-        # saveModel(model, "0.pt")
-    
-    # Code for profiling: 
-    import sys 
-    # import cProfile
-    
-    sys.stdout = open("profile.txt", "w")
-
-    createDataset(0)
-    
-    # sys.stdout.close()
