@@ -1,10 +1,9 @@
 # An implementation of parallel MCTS
 from typing import List, Tuple
 import numpy as np 
-from model import Net, device
-from state import checkIfGameIsWon, generateEmptyState, getStringRepresentation, makeMove, validMoves
-from config import Cpuct, enableValueHeadAfterIteration, rooloutsDuringTraining, width, height, mctsGPU, numberOfMapsPerPlayer, epsilon, disableValueHead
-import torch
+from model import Net
+from state import checkIfGameIsWon, makeMove, validMoves
+from config import Cpuct, enableValueHeadAfterIteration, width, epsilon 
 from logger import *
 from utils import loadLatestModel
 from predictor import Predictor
@@ -122,7 +121,7 @@ class ParallelMCTS:
                 self.Vs[s] = valids
                 self.Ns[s] = 0
                 
-                if (disableValueHead == False and self.iteration > enableValueHeadAfterIteration):
+                if (self.iteration > enableValueHeadAfterIteration):
                     # This is in relation to the current player, 
                     # therefore the value that should be backpropagated is -v
                     values[idx] = -v 
