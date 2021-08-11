@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Tuple, Union
 from utils import loadLatestModel
 import numpy as np 
 from model import Net, device
@@ -93,35 +93,35 @@ class MCTS:
 
         return self.predictions[byteString] 
 
-    def search (self, state: np.array):
+    def search (self, state: np.array): # TODO: replace s with byteString
         """ Performs the actual MCTS search recursively """
-        s = state.tobytes() # This is used as the key
+        byteString = state.tobytes() # This is used as the key
         
         # Save board termination 
-        if (s not in self.Es):
-            self.Es[s] = checkIfGameIsWon(state)
+        if (byteString not in self.Es):
+            self.Es[byteString] = checkIfGameIsWon(state)
               
-        if (self.Es[s] != -1): # This is a terminal node 
-            return self.Es[s] # return 1 if the previous player won the game (0 otherwise)
+        if (self.Es[byteString] != -1): # This is a terminal node 
+            return self.Es[byteString] # return 1 if the previous player won the game (0 otherwise)
         
-        if (s not in self.Ps): # We have hit a leaf node
+        if (byteString not in self.Ps): # We have hit a leaf node
             
             # Perform prediction if needed & and store said prediction for later
-            self.Ps[s], v = self.predict(state, s) 
+            self.Ps[byteString], v = self.predict(state, byteString) 
                 
             valids = validMoves(state)
-            self.Ps[s] = self.Ps[s] * valids # Mask probs (set probs[i] to 0 if i is not a valid move.)
-            sumOfProbs = np.sum(self.Ps[s])
+            self.Ps[byteString] = self.Ps[byteString] * valids # Mask probs (set probs[i] to 0 if i is not a valid move.)
+            sumOfProbs = np.sum(self.Ps[byteString])
             
             if (sumOfProbs > 0): # Normalize the probs
-                self.Ps[s] /= sumOfProbs
+                self.Ps[byteString] /= sumOfProbs
             else:
                 # If all probs where but the state isn't terminal, give all valid moves equal probability
                 warning("Warning: all moves where masked... ")
-                self.Ps[s] = valids / np.sum(valids)
+                self.Ps[byteString] = valids / np.sum(valids)
             
-            self.Vs[s] = valids
-            self.Ns[s] = 0
+            self.Vs[byteString] = valids
+            self.Ns[byteString] = 0
             
             if (disableValueHead == False and self.iteration > enableValueHeadAfterIteration):
                 # This is in relation to the current player, 
@@ -133,18 +133,17 @@ class MCTS:
             
         # Pick the action with the heighest UCBscore
         # Compute the value recursively
-        action = self.pickActionWithHighestUCBScore(state)
+        action = self.pickActionWithHighestUCBScore(byteString)
         v = self.search(makeMove(state, action))
         
-        if (s, action) in self.Qsa:
-            self.Qsa[(s, action)] = (self.Nsa[(s, action)] * self.Qsa[(s, action)] + v) / (self.Nsa[(s, action)] + 1)
-            self.Nsa[(s, action)] += 1
-            
+        if (byteString, action) in self.Qsa:
+            self.Qsa[(byteString, action)] = (self.Nsa[(byteString, action)] * self.Qsa[(byteString, action)] + v) / (self.Nsa[(byteString, action)] + 1)
+            self.Nsa[(byteString, action)] += 1
         else:
-            self.Qsa[(s, action)] = v
-            self.Nsa[(s, action)] = 1
+            self.Qsa[(byteString, action)] = v
+            self.Nsa[(byteString, action)] = 1
                     
-        self.Ns[s] += 1   
+        self.Ns[byteString] += 1   
         
         return -v
 

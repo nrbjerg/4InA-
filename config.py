@@ -89,10 +89,10 @@ rooloutsDuringEvaluation = 16
 # Model:
 numberOfFilters = 144
 numberOfResidualBlocks = 8
-numberOfNeurons = 512 # In the heads of the networks 
-numberOfHiddenLayers = 2
+numberOfNeurons = 256 # In the heads of the networks 
+numberOfHiddenLayers = 3 
 performBatchNorm = True
-dropoutRate = 0.3
+dropoutRate = 0.2
 disableValueHead = False # NOTE: This may be overwritten by the variable enableValueHeadAfterIteration
 
 # Valuehead:
@@ -103,4 +103,4 @@ policyHeadFilters = 32
 
 # State: 
 height, width = 6, 7
-numberOfMapsPerPlayer = 1
+numberOfMapsPerPlayer = 2 
