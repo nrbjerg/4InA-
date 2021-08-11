@@ -1,7 +1,6 @@
 from typing import List
 import os 
 import numpy as np
-from torch._C import T
 from utils import loadModel
 from model import Net
 from evaluate import evaluateModel

@@ -85,7 +85,7 @@ def makeMove (state: np.array, idx: int) -> np.array:
     return state
 
 @njit()
-def validMoves(state: np.array) -> np.array: # NOTE: These moves are only sudo legal ;)
+def validMoves(state: np.array) -> np.array:
     """ 
         Args: 
             - State: the numpy array currently representing the game

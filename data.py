@@ -12,7 +12,7 @@ import json
 import math
 from utils import loadLatestModel, saveModel
 from predictor import Predictor
-from logger import info
+from logger import logInfo 
 
 def sigmoid (x: float) -> float:
     # Just the standart sigmoid function
@@ -178,7 +178,7 @@ def convertTrainingDataToTensors (dataset: List[np.array], checkForNan: bool = F
     """
     # Check wether or not the dataset contains nan
     if checkForNan: 
-        info(str([np.isnan(np.sum(d)) for d in dataset[:3]]))
+        logInfo(str([np.isnan(np.sum(d)) for d in dataset[:3]]))
 
     dataset = [array.astype("float32") for array in dataset]
     tensors = [torch.from_numpy(array) for array in dataset]

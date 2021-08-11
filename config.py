@@ -61,8 +61,8 @@ epsilon = 1e-8
 
 # Training:
 iterations = 12
-numberOfGames = 32
-rooloutsDuringTraining = 50
+numberOfGames = 100
+rooloutsDuringTraining = 24
 tau = 8 # After this many moves, the moves will be deterministic.
 customReward = False
 rewardDropOf = 30
@@ -78,8 +78,8 @@ def window (iteration: int) -> int:
         return int(round(iteration ** (1.0 / 3)))
 
 learningRate = 0.001 
-epochs = 10
-batchSize = 64
+epochs = 5
+batchSize = 256
 trainingOnGPU = bool(torch.cuda.is_available()) 
 
 # Evaluation:

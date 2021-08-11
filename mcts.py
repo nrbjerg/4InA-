@@ -93,7 +93,7 @@ class MCTS:
 
         return self.predictions[byteString] 
 
-    def search (self, state: np.array): # TODO: replace s with byteString
+    def search (self, state: np.array): 
         """ Performs the actual MCTS search recursively """
         byteString = state.tobytes() # This is used as the key
         
@@ -117,7 +117,7 @@ class MCTS:
                 self.Ps[byteString] /= sumOfProbs
             else:
                 # If all probs where but the state isn't terminal, give all valid moves equal probability
-                warning("Warning: all moves where masked... ")
+                logWarning("Warning: all moves where masked... ")
                 self.Ps[byteString] = valids / np.sum(valids)
             
             self.Vs[byteString] = valids

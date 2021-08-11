@@ -6,7 +6,7 @@ from utils import loadLatestModel, loadModel
 import numpy as np
 from config import width
 from tqdm import tqdm
-from logger import info
+from logger import logInfo
 from config import numberOfEvaluationGames, rooloutsDuringEvaluation
 import random
 
@@ -90,7 +90,7 @@ def evaluateModel(model: Net, iteration: int, fast: bool = False, opponent: Net 
     # Compute the winrate
     winrate = computeWinrate(wins, numberOfEvaluationGames if not fast else 7) 
 
-    info(f"Winrate during evaluation : {winrate:.1f} %")
+    logInfo(f"Winrate during evaluation : {winrate:.1f} %")
     return winrate
       
 if (__name__ == "__main__"):

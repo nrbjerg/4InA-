@@ -9,14 +9,14 @@ from model import Net
 from config import learningRate, disableValueHead, batchSize, epochs, iterations, trainingOnGPU, mctsGPU, window
 import numpy as np
 from tqdm import trange
-from logger import info, error
+from logger import logInfo, logError
 from data import createDatasetWithNormalMCTS, convertTrainingDataToTensors, saveDataset, loadDataset
 
 mse = nn.MSELoss()
 
 def crossEntropy (predictions: Tensor, targets: Tensor) -> float:
     return torch.mean(-torch.sum(targets * torch.log_softmax(predictions, dim = 1), 1))
-
+    
 def updateWeights (model: Net, states: torch.Tensor, probs: torch.Tensor, rewards: torch.Tensor) -> Net:
     """ 
         Updates the weights of the neural network based on the training data 
@@ -56,8 +56,8 @@ def updateWeights (model: Net, states: torch.Tensor, probs: torch.Tensor, reward
                 predictions = model(s, training = True)
                 
                 # Check outputs for NaN
-                if (torch.sum(predictions[0] != predictions[0])): error("nan in policy")
-                elif (torch.sum(predictions[1] != predictions[1])): error("nan in value")
+                if (torch.sum(predictions[0] != predictions[0])): logError("nan in policy")
+                elif (torch.sum(predictions[1] != predictions[1])): logError("nan in value")
                 
                 policyLoss = crossEntropy(predictions[0], p)
                 valueLoss = 0
@@ -87,9 +87,9 @@ def updateWeights (model: Net, states: torch.Tensor, probs: torch.Tensor, reward
             # Log information about the losses
             if (e == epochs  - 1):
                 if (disableValueHead == False):
-                    info(f"Ended with losses: \n - value loss: {valueLoss.item():.4f}\n - policy loss: {policyLoss.item():.4f}")
+                    logInfo(f"Ended with losses: \n - value loss: {valueLoss.item():.4f}\n - policy loss: {policyLoss.item():.4f}")
                 else:
-                    info(f"Ended with losses: \n - policy loss: {policyLoss.item():.4f}")
+                    logInfo(f"Ended with losses: \n - policy loss: {policyLoss.item():.4f}")
                     
     if (mctsGPU == False and trainingOnGPU == True):
         model.cpu()
@@ -100,26 +100,26 @@ def train (model: Net, startingIteration: int):
     """ Trains the model using self play & evaluation """
     datasets = loadDataset() # Load the dataset if it's present in the directory
     
-    for iteration in range(startingIteration, iterations + startingIteration):
-        print(f"\nAt iteration: {iteration + 1} / {iterations + startingIteration}")
-        info(f"At iteration: {iteration + 1}:")
+    for iteration in range(startingIteration, iterations):
+        print(f"\nAt iteration: {iteration + 1} / {iterations}")
+        logInfo(f"\nAt iteration: {iteration + 1}:")
         
         # Create new dataset and append it to datasets
-        states, probs, rewards = createDatasetWithNormalMCTS(model, iteration - startingIteration)
+        states, probs, rewards = createDatasetWithNormalMCTS(model, iteration)
         datasets.append([states, probs, rewards])
         
         # Remove old datapoints
-        while (len(datasets) > window(iteration + 1)):
+        while (len(datasets) > window(iteration) - 1):
             datasets.pop(0)
         
         # Concatenate states, probs & rewards for training 
         data = [[] for _ in range(3)]
-        for d in datasets:
-            for idx, val in enumerate(d):
-                data[idx].extend(val)
+        for dataset in datasets:
+            for idx, col in enumerate(dataset):
+                data[idx].extend(col)
                 
         data = [np.stack(d) for d in data]
-        info(f"There is currently {data[0].shape[0]} datapoints in training data, from a maximum of {window(iteration)} iterations")
+        logInfo(f"There is currently {data[0].shape[0]} datapoints in training data, from a maximum of {window(iteration)} iterations")
         states, probs, rewards = convertTrainingDataToTensors(data)
         
         model = updateWeights(model, states, probs, rewards)
@@ -128,14 +128,13 @@ def train (model: Net, startingIteration: int):
         percentage = evaluateModel(model, iteration) 
         
         if (percentage >= 50.0):
-            print("Evaluation: New model won.")
+            print(f"Evaluation: New model won with {percentage}% winrate.")
             saveModel(model, f"{iteration + 1}.pt")
         else:
+            print(f"Evaluation: New model lost with {percentage}% winrate.")
             datasets.pop() # Remove the last entry from the dataset 
             model = loadLatestModel()[0] # Load better model
             
-        info("\n")
-    
     # Save the dataest for the future if needed
     saveDataset(datasets) 
 

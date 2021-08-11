@@ -5,11 +5,11 @@ def log (file: str, msg: str):
     with open(os.path.join(os.getcwd(), "logs", file), "a+") as file:
         file.write(msg + "\n")
 
-def info (msg: str):
+def logInfo (msg: str):
     log("info.txt", msg)
 
-def warning (msg: str):
+def logWarning (msg: str):
     log("warning.txt", msg)
 
-def error (msg: str):
+def logError (msg: str):
     log("error.txt", msg)

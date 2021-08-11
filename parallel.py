@@ -115,7 +115,7 @@ class ParallelMCTS:
                     self.Ps[s] /= sumOfProbs
                 else:
                     # If all probs where 0 but the state isn't terminal, give all valid moves equal probability
-                    warning("Warning: all moves where masked... ")
+                    logWarning("Warning: all moves where masked... ")
                     self.Ps[s] = valids / np.sum(valids)
                 
                 self.Vs[s] = valids
