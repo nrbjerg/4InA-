@@ -14,8 +14,6 @@ from utils import loadLatestModel, saveModel
 from predictor import Predictor
 from logger import info
 
-predictor = Predictor(loadLatestModel()[0])
-
 def sigmoid (x: float) -> float:
     # Just the standart sigmoid function
     return 1 / (1 + math.exp(x))
@@ -31,16 +29,13 @@ def assignRewards(datapoints: List[List[np.array]], reward: float) -> List[List[
         n = len(datapoints)
 
         for i in range(n):
-            if (i >= rewardDropOf):
-                datapoints[n - i - 1][-1] = reward
-                # The next state will be from the other players view (thus -reward)
-                # Also the numerical value of the rewards should drop of after each move
-                if customReward == True: 
-                    reward = 1 - (sigmoid(-i // 2) / 2 - 0.2) if (i % 2) == 0 else -reward
-                else:
-                    reward = -1.0
-            else: 
-                datapoints[n - i - 1][-1] = 0
+            if i > rewardDropOf: # Only assign rewards to the last few game states 
+                break
+
+            datapoints[n - (i + 1)][-1] = reward
+            # The next state will be from the other players view (thus -reward)
+            # Also the numerical value of the rewards should drop of after each move if using custom reward function
+            reward = -np.sign(reward) / (i + 1) if customReward == True else -reward
 
     return datapoints
 
@@ -63,6 +58,14 @@ def stackDataset(dataset: List[List[np.array]]) -> np.array:
     arrays = [[item[idx] for item in dataset] for idx in range(3)] # Create a list with nested lists of gamestates, probs, rewards
     return tuple(np.stack(array) for array in arrays) # Stack the lists together
 
+def choseMove (probs: np.array, numberOfMoves: int) -> int:
+    """ Choses a move determined by the probs & the number of moves """
+    return (
+            random.choice(len(probs), p=probs)
+            if (numberOfMoves < tau)
+            else np.argmax(probs)
+    )
+
 def executeEpisode(mcts: MCTS) -> List[List[np.array]]:
     """ 
         Args: 
@@ -80,11 +83,7 @@ def executeEpisode(mcts: MCTS) -> List[List[np.array]]:
         probs = probs.flatten()
 
         # Chose move (if the number of moves is < tau, play deterministically)
-        move = (
-            random.choice(len(probs), p=probs)
-            if (numberOfMoves < tau)
-            else np.argmax(probs)
-        )
+        move = choseMove(probs, numberOfMoves)
 
         # Make the new move, check for rewards
         state = makeMove(state, move)
@@ -92,7 +91,8 @@ def executeEpisode(mcts: MCTS) -> List[List[np.array]]:
 
         if (reward != -1):
             # Assign rewards & add mirror images of the states
-            return addMirrorImages(assignRewards(datapoints, float(reward)))
+            return assignRewards(datapoints, float(reward))
+            # return addMirrorImages(assignRewards(datapoints, float(reward)))
 
 def createDatasetWithNormalMCTS (model: Net, iteration: int) -> Tuple[np.array]:
     """ 
@@ -102,10 +102,13 @@ def createDatasetWithNormalMCTS (model: Net, iteration: int) -> Tuple[np.array]:
             - A dataset in the form of a tuple of numpy arrays specifically (states, policies, rewards)
     """
     mcts = MCTS(model = model, iteration = iteration)
+
+    # Generate training data
     dataset = []
-    for _ in tqdm(range(numberOfGames), unit = "game"):
+    for _ in tqdm(range(numberOfGames), unit = " game"):
         dataset += executeEpisode(mcts)
         mcts.reset() # Remove old states in mcts
+
     return stackDataset(dataset)
 
 def createDatasetWithParrallelMCTS (iteration: int) -> Tuple[np.array]:
@@ -117,7 +120,7 @@ def createDatasetWithParrallelMCTS (iteration: int) -> Tuple[np.array]:
     """
     # TODO: There is some major problems with this code
     print("Creating dataset:")
-    predictor.updateModel()
+    # predictor.updateModel()
     # Initialize montecarlo tree search
     mcts = ParallelMCTS(iteration = iteration)
 
@@ -178,7 +181,7 @@ def convertTrainingDataToTensors (dataset: List[np.array], checkForNan: bool = F
         info(str([np.isnan(np.sum(d)) for d in dataset[:3]]))
 
     dataset = [array.astype("float32") for array in dataset]
-    tensors = [torch.from_numpy(array).float() for array in dataset]
+    tensors = [torch.from_numpy(array) for array in dataset]
     
     # Move arrays to gpu if needed
     if (trainingOnGPU == True):
@@ -201,7 +204,7 @@ def saveDataset(dataset: List[List[np.array]]):
     }
 
     # Save the data to the data.json file
-    with open("data/data.json", "w") as jsonFile:
+    with open("data/data.json", "w+") as jsonFile:
         json.dump(jsonObject, jsonFile)
         
 def loadDataset() -> List[List[np.array]]:

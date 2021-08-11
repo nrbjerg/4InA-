@@ -40,8 +40,8 @@ def updateWeights (model: Net, states: torch.Tensor, probs: torch.Tensor, reward
             
             permutation = torch.randperm(states.size()[0])
             
-            vLoss = 0
-            pLoss = 0
+            valueLoss = 0
+            policyLoss = 0
             batches = 0
             for idx in range(0, states.size()[0], batchSize):
                 batches += 1
@@ -71,27 +71,26 @@ def updateWeights (model: Net, states: torch.Tensor, probs: torch.Tensor, reward
                 optimizer.step()
                 
                 # Update the total loss
-                pLoss += policyLoss.item()
+                policyLoss += policyLoss.item()
                 if (disableValueHead == False):
-                    vLoss += valueLoss.item()
+                    valueLoss += valueLoss.item()
 
-            pLoss /= batches
-            vLoss /= batches
+            policyLoss /= batches
+            valueLoss /= batches
             
             # Update progres bar
             if (disableValueHead == False):
-                t.set_postfix(pl = pLoss, vl = vLoss)
-            else:
-                t.set_postfix(pl = pLoss)
+                t.set_postfix(pl = policyLoss.item(), vl = valueLoss.item())
+            else: 
+                t.set_postfix(pl = policyLoss.item())
             
             # Log information about the losses
             if (e == epochs  - 1):
                 if (disableValueHead == False):
-                    info(f"Ended with losses: \n - value loss: {vLoss:.4f}\n - policy loss: {pLoss:.4f}")
+                    info(f"Ended with losses: \n - value loss: {valueLoss.item():.4f}\n - policy loss: {policyLoss.item():.4f}")
                 else:
-                    info(f"Ended with losses: \n - policy loss: {pLoss:.4f}")
-
-    # Move the model back to the cpu if needed.
+                    info(f"Ended with losses: \n - policy loss: {policyLoss.item():.4f}")
+                    
     if (mctsGPU == False and trainingOnGPU == True):
         model.cpu()
 
@@ -99,11 +98,11 @@ def updateWeights (model: Net, states: torch.Tensor, probs: torch.Tensor, reward
 
 def train (model: Net, startingIteration: int):
     """ Trains the model using self play & evaluation """
-    datasets = loadDataset() # Load the dataset if it's present in the directory.
+    datasets = loadDataset() # Load the dataset if it's present in the directory
     
     for iteration in range(startingIteration, iterations + startingIteration):
-        print(f"\nAt iteration {iteration + 1} / {iterations + startingIteration}")
-        info(f"At iteration {iteration + 1}:")
+        print(f"\nAt iteration: {iteration + 1} / {iterations + startingIteration}")
+        info(f"At iteration: {iteration + 1}:")
         
         # Create new dataset and append it to datasets
         states, probs, rewards = createDatasetWithNormalMCTS(model, iteration - startingIteration)
@@ -115,12 +114,12 @@ def train (model: Net, startingIteration: int):
         
         # Concatenate states, probs & rewards for training 
         data = [[] for _ in range(3)]
-        for datapoint in datasets:
-            for idx, val in enumerate(datapoint):
+        for d in datasets:
+            for idx, val in enumerate(d):
                 data[idx].extend(val)
                 
         data = [np.stack(d) for d in data]
-        info(f"There is currently {data[0].shape[0]} datapoints in training data, from a maximum of {window(iteration)} games")
+        info(f"There is currently {data[0].shape[0]} datapoints in training data, from a maximum of {window(iteration)} iterations")
         states, probs, rewards = convertTrainingDataToTensors(data)
         
         model = updateWeights(model, states, probs, rewards)
@@ -131,7 +130,6 @@ def train (model: Net, startingIteration: int):
         if (percentage >= 50.0):
             print("Evaluation: New model won.")
             saveModel(model, f"{iteration + 1}.pt")
-            
         else:
             datasets.pop() # Remove the last entry from the dataset 
             model = loadLatestModel()[0] # Load better model
@@ -142,18 +140,8 @@ def train (model: Net, startingIteration: int):
     saveDataset(datasets) 
 
 if __name__ == '__main__':
-    
     model, iteration = loadLatestModel()
     if (iteration == 0):
         saveModel(model, "0.pt")
-    
+        
     train(model, iteration)
-    # Code for profiling: 
-    # import sys 
-    # import cProfile
-    
-    # sys.stdout = open("profile.txt", "w")
-    
-    # cProfile.run("train(model, iteration)")
-    
-    # sys.stdout.close()

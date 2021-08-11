@@ -1,7 +1,7 @@
 import torch 
 from torch import nn
 import torch.nn.functional as F
-from config import width, height, numberOfResidualBlocks, disableValueHead, numberOfFilters, dropoutRate, numberOfHiddenLayers, numberOfMapsPerPlayer, numberOfNeurons, valueHeadFilters, policyHeadFilters, performBatchNorm
+from config import width, height, numberOfResidualBlocks, numberOfFilters, dropoutRate, numberOfHiddenLayers, numberOfMapsPerPlayer, numberOfNeurons, valueHeadFilters, policyHeadFilters, performBatchNorm
 from torch import Tensor
 
 device = torch.device('cuda' if torch.cuda.is_available() else "cpu")
@@ -113,9 +113,7 @@ class Net (nn.Module):
         
         # Policy & value head
         self.policyHead = PolicyHead()
-        
-        if (disableValueHead == False):
-            self.valueHead = ValueHead()
+        self.valueHead = ValueHead()
         
     def forward (self, x: Tensor, training: bool = False) -> Tensor:
         """ Pass data through the network """
@@ -127,15 +125,11 @@ class Net (nn.Module):
         # Pass the data through value head and policy head
         p = self.policyHead(x, training = training)
         
-        if (disableValueHead == False):
-            v = self.valueHead(x)
-            return (p, v) # [x, 7], [x, 1]
-        
-        else:
-            return (p, torch.zeros(p.shape[0], 1))
+        v = self.valueHead(x)
+        return (p, v) # [x, 7], [x, 1]
     
-    def numberOfParameters (self) -> int:
-        return sum([p.numel() for p in self.parameters()])
+    def numberOfParameters(self) -> int:
+        return sum(p.numel() for p in self.parameters())
 
 if (__name__ == '__main__'):
     m = Net()

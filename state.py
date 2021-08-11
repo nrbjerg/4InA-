@@ -5,7 +5,7 @@ from config import width, height, numberOfMapsPerPlayer
 @njit()
 def flipPlayer (state: np.array):
     """ Flips the values in the last index of the states tensor from 0 to 1 or from 1 to 0 """
-    state[-1].fill(1 if state[-1][0][0] != 1 else -1) # TODO: Check if this should be -1
+    state[-1].fill(1 if state[-1][0][0] != 1 else 0) # TODO: Check if this should be -1
 
 @njit()
 def generateEmptyState () -> np.array:
