@@ -1,7 +1,7 @@
 # 4inA-
 An implementation of Alpha Zero, for connect 4. Using: NumPy, Numba & PyTorch.
 
-The project is currently being upgraded for parallel MCTS for training & evaluation purposes, so it doesn't currently function correctly.
+The project is currently being upgraded for parallel MCTS for training & evaluation purposes, as a result it doesn't currently function correctly.
 
 ### Let me play!
 
