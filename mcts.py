@@ -1,10 +1,9 @@
 from typing import Tuple, Union
 from utils import loadLatestModel
 import numpy as np 
-from model import Net, device
-from state import checkIfGameIsWon, flipPlayer, generateEmptyState, makeMove, validMoves
-from config import Cpuct, enableValueHeadAfterIteration, rooloutsDuringTraining, width, height, mctsGPU, numberOfMapsPerPlayer, epsilon, disableValueHead
-import torch
+from model import Net 
+from state import checkIfGameIsWon, generateEmptyState, makeMove, validMoves
+from config import Cpuct, enableValueHeadAfterIteration, rooloutsDuringTraining, width, epsilon, disableValueHead
 from logger import *
 from predictor import Predictor
 

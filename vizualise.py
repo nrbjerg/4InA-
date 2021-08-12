@@ -30,5 +30,5 @@ def visualizeWinRates (modelIterations: List[int]) -> List[float]:
 
 if (__name__ == "__main__"):
     files = os.listdir(os.path.join(os.getcwd(), "models"))
-    iterations = [int(f.split(".")[0]) for f in files]
+    iterations = sorted([int(f.split(".")[0]) for f in files])
     visualizeWinRates(iterations)

@@ -31,7 +31,7 @@ class Predictor:
         
         with torch.no_grad():
             # Format the data correctly for the neural network & move it to gpu
-            stateTensor = torch.from_numpy(states).view(numberOfStates, 2 * numberOfMapsPerPlayer + 1, height, width)
+            stateTensor = torch.from_numpy(states).view(numberOfStates, 2 * numberOfMapsPerPlayer, height, width)
             if (mctsGPU == True): 
                 stateTensor = stateTensor.to(device)
     

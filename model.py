@@ -107,7 +107,7 @@ class Net (nn.Module):
         super(Net, self).__init__()
         """ Initializes the neural network """
         # Shared network
-        self.conv1 = nn.Conv2d(2 * numberOfMapsPerPlayer + 1, numberOfFilters, 2, padding = 1)
+        self.conv1 = nn.Conv2d(2 * numberOfMapsPerPlayer, numberOfFilters, 2, padding = 1)
         self.bn1 = nn.BatchNorm2d(numberOfFilters)
         self.residualBlocks = nn.ModuleList([ResidualBlock() for i in range(numberOfResidualBlocks)])
         

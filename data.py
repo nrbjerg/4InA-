@@ -9,14 +9,7 @@ from typing import List, Tuple
 from config import numberOfGames, rooloutsDuringTraining, width, height, trainingOnGPU, tau, customReward, rewardDropOf
 from tqdm import tqdm
 import json 
-import math
-from utils import loadLatestModel, saveModel
-from predictor import Predictor
 from logger import logInfo 
-
-def sigmoid (x: float) -> float:
-    # Just the standart sigmoid function
-    return 1 / (1 + math.exp(x))
 
 def assignRewards(datapoints: List[List[np.array]], reward: float) -> List[List[np.array]]:
     """
@@ -28,11 +21,8 @@ def assignRewards(datapoints: List[List[np.array]], reward: float) -> List[List[
     if (reward != 0.0):
         n = len(datapoints)
 
-        for i in range(n):
-            if i > rewardDropOf: # Only assign rewards to the last few game states 
-                break
-
-            datapoints[n - (i + 1)][-1] = reward
+        for i in range(min(rewardDropOf, n)):
+            datapoints[-(i + 1)][-1] = reward
             # The next state will be from the other players view (thus -reward)
             # Also the numerical value of the rewards should drop of after each move if using custom reward function
             reward = -np.sign(reward) / (i + 1) if customReward == True else -reward
@@ -118,7 +108,7 @@ def createDatasetWithParrallelMCTS (iteration: int) -> Tuple[np.array]:
         Returns:
             - A dataset in the form of a tuple of numpy arrays specifically (states, policies, rewards)
     """
-    # TODO: There is some major problems with this code
+    # FIXME: There is some major problems with this code
     print("Creating dataset:")
     # predictor.updateModel()
     # Initialize montecarlo tree search
